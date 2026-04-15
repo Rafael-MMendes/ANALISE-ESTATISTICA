@@ -1,0 +1,26 @@
+# Logs and debug files
+*.log
+erro_*.png
+debug_*.png
+debug_*.html
+dom_*.txt
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# Environment and Data
+.env
+cad_session.json
+dados/
+
+# Exports
+*.pdf
+*.xls
+*.xlsx
+
+# Streamlit secrets (just in case)
+.streamlit/secrets.toml

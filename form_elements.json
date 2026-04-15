@@ -1,0 +1,138 @@
+{
+    "selects": [
+        {
+            "id": "",
+            "class": "",
+            "name": "",
+            "options": [
+                "2007",
+                "2009",
+                "2010",
+                "2011",
+                "2012",
+                "2013",
+                "2014",
+                "2015",
+                "2016",
+                "2017",
+                "2018",
+                "2019",
+                "2020",
+                "2021",
+                "2022",
+                "2023",
+                "2024",
+                "2025",
+                "2026",
+                ""
+            ]
+        },
+        {
+            "id": "",
+            "class": "",
+            "name": "",
+            "options": [
+                "HTML (Paginado)",
+                "HTML (Página Única)",
+                "HTML (Email)",
+                "PDF",
+                "Excel",
+                "Excel 2007",
+                "CSV",
+                "RTF",
+                "TXT"
+            ]
+        }
+    ],
+    "buttons": [
+        {
+            "id": "",
+            "class": "pentaho-button",
+            "text": "View Report"
+        },
+        {
+            "id": "systemLimitRunNow",
+            "class": "pentaho-button",
+            "text": "Run Now"
+        },
+        {
+            "id": "systemLimitSchedule",
+            "class": "pentaho-button",
+            "text": "Schedule"
+        }
+    ],
+    "inputs": [
+        {
+            "id": "",
+            "class": "dijitReset dijitInputField dijitValidationIcon dijitValidationInner",
+            "type": "text",
+            "value": "Χ "
+        },
+        {
+            "id": "dijit_form_NumberTextBox_0",
+            "class": "dijitReset dijitInputInner",
+            "type": "text",
+            "value": "1"
+        },
+        {
+            "id": "",
+            "class": "",
+            "type": "hidden",
+            "value": "1"
+        },
+        {
+            "id": "",
+            "class": "dijitOffScreen",
+            "type": "button",
+            "value": ""
+        },
+        {
+            "id": "",
+            "class": "dijitReset dijitInputField dijitValidationIcon dijitValidationInner",
+            "type": "text",
+            "value": "Χ "
+        },
+        {
+            "id": "",
+            "class": "",
+            "type": "hidden",
+            "value": "MAXIMUM"
+        },
+        {
+            "id": "",
+            "class": "dijitReset dijitInputField dijitArrowButtonInner",
+            "type": "text",
+            "value": "▼ "
+        },
+        {
+            "id": "",
+            "class": "dijitReset dijitInputField dijitValidationIcon dijitValidationInner",
+            "type": "text",
+            "value": "Χ "
+        },
+        {
+            "id": "rowsNumberInput",
+            "class": "dijitReset dijitInputInner",
+            "type": "text",
+            "value": ""
+        },
+        {
+            "id": "",
+            "class": "dijitOffScreen",
+            "type": "button",
+            "value": ""
+        },
+        {
+            "id": "",
+            "class": "",
+            "type": "hidden",
+            "value": "Submit"
+        }
+    ],
+    "dojos": [
+        {
+            "id": "row-limit-restrictions",
+            "text": "Maximum\n\t"
+        }
+    ]
+}
