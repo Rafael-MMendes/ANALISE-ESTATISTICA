@@ -800,11 +800,11 @@ def render_header():
                 <div class="header-badge">
                     Sistema de Gestão de Dados
                 </div>
-                <div style="color: rgba(255,255,255,0.65); font-size: 0.72rem; font-weight: 400; text-align: right;">
-                    Created By 2&#186; Sgt PM Monteiro e 3&#186; Sgt PM Alan Kleber
+                <div style="color: rgba(255,255,255,0.85); font-size: 0.75rem; font-weight: 500; text-align: right;">
+                    Fonte de Dados: NEAC / CAD / Pentaho
                 </div>
                 <div style="color: rgba(255,255,255,0.85); font-size: 0.75rem; font-weight: 500; text-align: right; margin-top: 4px;">
-                    Fonte de Dados: NEAC / CAD / Pentaho
+                    Created By 2&#186; Sgt PM Monteiro e 3&#186; Sgt PM Alan Kleber
                 </div>
             </div>
         </div>
@@ -2377,18 +2377,7 @@ with st.sidebar:
          </div>
       """, unsafe_allow_html=True)
 
-    st.markdown("""
-    <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; 
-                padding: 16px 18px; margin-top: 4px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
-        <div style="color: #64748B; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; 
-                    letter-spacing: 0.8px; margin-bottom: 12px; text-align: center;">
-            ANO DE REFERÊNCIA
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
 
-    # SELETOR DE ANO DE REFERÊNCIA POSICIONADO CORRETAMENTE NA SIDEBAR
-    ano_selecionado = st.selectbox("Ano de Referência", [2024, 2025, 2026], index=2, label_visibility="collapsed")
 
     st.markdown("""
     <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; 
@@ -2438,7 +2427,10 @@ with st.sidebar:
 
 
 # ---------------- NAVEGAÇÃO E SINC DE DADOS ----------------
-_, col_sync = st.columns([8.5, 1.5])
+_, col_ano, col_sync = st.columns([7.0, 1.5, 1.5])
+
+with col_ano:
+    ano_selecionado = st.selectbox("Ano", [2024, 2025, 2026], index=2, label_visibility="collapsed")
 
 
 with col_sync:
