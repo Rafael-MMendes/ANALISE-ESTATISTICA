@@ -217,7 +217,7 @@ st.set_page_config(
     page_title="Gestão de Dados 9º BPM - PMAL",
     page_icon="🛡️",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # Custom CSS - Light Modern Theme (9º BPM PMAL)
@@ -259,7 +259,7 @@ st.markdown("""
 
     /* === HEADER INSTITUCIONAL === */
     .header-wrapper {
-        margin-top: -70px;
+        margin-top: -4px;
         margin-bottom: 20px;
     }
 
@@ -343,52 +343,21 @@ st.markdown("""
         border: 1px solid rgba(255,255,255,0.15);
     }
 
-    /* === SIDEBAR === */
-    section[data-testid="stSidebar"] {
-        background: var(--fundo-card);
-        border-right: 1px solid var(--borda-clara);
-        min-width: 17rem;
-        max-width: 17rem;
-        width: 17rem;
-        transition: none !important;
-    }
-    section[data-testid="stSidebar"] .stMarkdown {
-        color: var(--texto-principal);
-    }
-    section[data-testid="stSidebar"] [data-testid="stSelectbox"] label {
+    /* === SIDEBAR OCULTA === */
+    section[data-testid="stSidebar"],
+    section[data-testid="stSidebar"][aria-collapsed="true"],
+    section[data-testid="stSidebar"][aria-collapsed="false"] {
         display: none !important;
-    }
-    section[data-testid="stSidebar"] [data-testid="stSelectbox"] {
-        display: flex;
-        justify-content: center;
-    }
-    section[data-testid="stSidebar"] [data-testid="stSelectbox"] > div {
-        width: 60%;
-    }
-
-    /* Sidebar fixa: ocultar TODOS os botões de recolher/expandir */
-    [data-testid="stSidebarCollapsedControl"],
-    button[kind="header"],
-    [data-testid="collapsedControl"],
-    .stSidebarCollapsedControl,
-    [data-testid="stSidebar"] [data-testid="stToolbar"],
-    [data-testid="stSidebar"] button[title="Close sidebar"],
-    button[data-testid="baseButton-header"] {
-        display: none !important;
-        visibility: hidden !important;
-        pointer-events: none !important;
-        height: 0 !important;
         width: 0 !important;
+        min-width: 0 !important;
+        max-width: 0 !important;
         overflow: hidden !important;
     }
-    section[data-testid="stSidebar"][aria-collapsed="true"] {
-        display: block !important;
-        visibility: visible !important;
-        transform: none !important;
-        margin-left: 0 !important;
-        min-width: 17rem !important;
-        max-width: 17rem !important;
-        width: 17rem !important;
+    [data-testid="stSidebarCollapsedControl"],
+    [data-testid="collapsedControl"],
+    button[data-testid="baseButton-header"],
+    button[kind="header"] {
+        display: none !important;
     }
 
     /* === SELECTBOX === */
@@ -764,41 +733,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Forçar sidebar fixa via JavaScript (remove botão de recolher do DOM)
-st.markdown("""
-<script>
-(function() {
-    function removeCollapseBtn() {
-        // Remove todos os botões conhecidos de colapso
-        var selectors = [
-            '[data-testid="stSidebarCollapsedControl"]',
-            '[data-testid="collapsedControl"]',
-            'button[kind="header"]',
-            'button[data-testid="baseButton-header"]'
-        ];
-        selectors.forEach(function(sel) {
-            document.querySelectorAll(sel).forEach(function(el) { el.remove(); });
-        });
-        // Força sidebar visível
-        var sidebar = document.querySelector('section[data-testid="stSidebar"]');
-        if (sidebar) {
-            sidebar.style.minWidth = '17rem';
-            sidebar.style.maxWidth = '17rem';
-            sidebar.style.width = '17rem';
-            sidebar.removeAttribute('aria-collapsed');
-            sidebar.style.display = 'block';
-            sidebar.style.visibility = 'visible';
-            sidebar.style.transform = 'none';
-            sidebar.style.marginLeft = '0';
-        }
-    }
-    removeCollapseBtn();
-    // Observer para remover caso o React recrie o botão
-    var obs = new MutationObserver(function() { removeCollapseBtn(); });
-    obs.observe(document.body, { childList: true, subtree: true });
-})();
-</script>
-""", unsafe_allow_html=True)
+
 
 # ----------------- RENDERING MODULES -----------------
 
@@ -2389,78 +2324,7 @@ def render_home_dashboard(ano_selecionado):
 
 render_header()
 
-# Sidebar com Informações do 9º BPM
-with st.sidebar:
-    sidebar_logo_b64 = _img_to_base64("brasao_9bpm.png")
-    sidebar_logo_tag = f'<img src="data:image/png;base64,{sidebar_logo_b64}">' if sidebar_logo_b64 else ""
 
-    st.markdown(f"""
-    <div style="background: linear-gradient(160deg, #0D3878 0%, #1E5AAF 100%); 
-                padding: 24px 20px; border-radius: 16px; text-align: center; margin-bottom: 16px;
-                box-shadow: 0 4px 12px rgba(13,56,120,0.25); position: relative; overflow: hidden;">
-        <div style="position: absolute; top: -20px; right: -20px; width: 80px; height: 80px; 
-                    background: rgba(255,255,255,0.06); border-radius: 50%;"></div>
-        <div style="width: 72px; height: 72px; margin: 0 auto 12px auto; border-radius: 50%; 
-                    background: rgba(255,255,255,0.15); padding: 5px; display: flex; 
-                    align-items: center; justify-content: center;">
-            {sidebar_logo_tag}
-        </div>
-        <div style="color: #FFFFFF; font-size: 1.05rem; font-weight: 700; margin-bottom: 4px;">
-            9º Batalhão PMAL
-        </div>
-        <div style="color: rgba(255,255,255,0.75); font-size: 0.78rem; font-weight: 400; line-height: 1.5;">
-            Polícia Militar de Alagoas<br>Delmiro Gouveia
-        </div>
-         </div>
-      """, unsafe_allow_html=True)
-
-
-
-    st.markdown("""
-    <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; 
-                padding: 16px 18px; margin-top: 4px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
-        <div style="color: #64748B; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; 
-                    letter-spacing: 0.8px; margin-bottom: 12px; text-align: center;">
-            MUNICÍPIOS DE ATUAÇÃO
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("""
-    <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; 
-                padding: 16px 18px; margin-top: 4px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
-        <div style="color: #64748B; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; 
-                    letter-spacing: 0.8px; margin-bottom: 12px; text-align: center;">
-            MUNICÍPIOS DE ATUAÇÃO
-        </div>
-        <div style="display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;">
-            <span style="background: #EEF2FF; color: #0D3878; padding: 4px 10px; border-radius: 20px; 
-                         font-size: 0.75rem; font-weight: 600;">Delmiro Gouveia</span>
-            <span style="background: #EEF2FF; color: #0D3878; padding: 4px 10px; border-radius: 20px; 
-                         font-size: 0.75rem; font-weight: 600;">Canapi</span>
-            <span style="background: #EEF2FF; color: #0D3878; padding: 4px 10px; border-radius: 20px; 
-                         font-size: 0.75rem; font-weight: 600;">Mata Grande</span>
-            <span style="background: #EEF2FF; color: #0D3878; padding: 4px 10px; border-radius: 20px; 
-                         font-size: 0.75rem; font-weight: 600;">Piranhas</span>
-            <span style="background: #EEF2FF; color: #0D3878; padding: 4px 10px; border-radius: 20px; 
-                         font-size: 0.75rem; font-weight: 600;">Água Branca</span>
-            <span style="background: #EEF2FF; color: #0D3878; padding: 4px 10px; border-radius: 20px; 
-                         font-size: 0.75rem; font-weight: 600;">Inhapi</span>
-            <span style="background: #EEF2FF; color: #0D3878; padding: 4px 10px; border-radius: 20px; 
-                         font-size: 0.75rem; font-weight: 600;">Olho d'Água do Casado</span>
-            <span style="background: #EEF2FF; color: #0D3878; padding: 4px 10px; border-radius: 20px; 
-                         font-size: 0.75rem; font-weight: 600;">Pariconha</span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-
-    st.markdown("""
-    <div style="text-align: center; padding: 12px 0 4px 0; color: #94A3B8; font-size: 0.72rem; line-height: 1.6;">
-        Dashboard Estatístico v2.0<br>
-        Sistema de Gestão de Dados
-    </div>
-    """, unsafe_allow_html=True)
 
 
 # ---------------- NAVEGAÇÃO E SINC DE DADOS ----------------
