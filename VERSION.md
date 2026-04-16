@@ -6,6 +6,36 @@ O formato é baseado em [Versionamento Semântico (SemVer)](https://semver.org/l
 
 ---
 
+## [2.0.0] - 2026-04-15
+
+### [Adicionado]
+- Integração do botão **Sincronizar Bancos** diretamente no cabeçalho da página principal (ao lado do seletor de ano), dispensando o uso da sidebar para esta função.
+- Seletor de **Ano de Referência** movido da sidebar para a linha de navegação, junto ao botão Sincronizar.
+- Informação **"Fonte de Dados: NEAC / CAD / Pentaho"** adicionada ao cabeçalho, acima de "Created By", com tipografia padronizada e mesma espessura de fonte.
+- **Sistema de ícones Material Design** (`st.button(icon=":material/...")`) aplicado a todos os botões de navegação e indicadores:
+  - Navegação principal: Início, Consolidado, Comparativo, Crimes Vida, Patrimônio, Operacional.
+  - Sub-navegação Consolidado: Relatório Anual, Análise Mensal / Cidade.
+  - Sub-navegação Comparativo: Comparativo Anual, Análise Temporal Personalizada.
+  - Indicadores de Crimes Vida e Operacional.
+  - Botão Sincronizar.
+
+### [Alterado]
+- **Navegação principal** migrada de `st.tabs()` para botões com `st.session_state`, padrão 100% consistente com os menus internos. Botão ativo exibe marcador `✓`.
+- **Abas de Indicadores** (Operacional e Crimes Vida) padronizados com ícones Material e remoção de emojis Unicode antigos.
+- **Cabeçalho (Header):** efeito **Glassmorphism** (`backdrop-filter: blur(10px)` + gradiente com transparência). Brasões com fundo branco sólido e sombra para maior contraste.
+- **Título "Dashboard Estatístico"** com `font-weight: 900` (Ultra Bold) para hierarquia visual clara.
+- **Estilo das Tabs** migrado para modelo corporativo minimalista: fundo transparente, separador inferior (`border-bottom`), sem caixas arredondadas.
+- **Gutter System** aprimorado: maior espaçamento entre seções (`margin-bottom: 28px`, `padding-top: 2rem`, `hr: 28px`, `h2/h3` com margens ajustadas).
+- **Micro-interações** nos botões: `transform: translateY(-3px)` e sombra elevada no hover, com transição suave de `0.2s`.
+- Coleta de dados do **CAD** configurada para modo **headless** (`headless=True`), eliminando janela visível do navegador durante a sincronização.
+- Seção "FONTES DE DADOS" removida da sidebar; sidebar simplificada (logo, municípios e versão).
+- **"Fonte de Dados"** e **"Created By"** no header trocados de posição e padronizados com mesma fonte e tamanho.
+
+### [Corrigido]
+- Conteúdo da página ficava recuado ao posicionar botão Sincronizar dentro de colunas junto às abas. Corrigido mantendo tabs fora de colunas e botão em coluna independente.
+
+---
+
 ## [1.1.1] - 2026-04-01
 
 ### [Corrigido]
