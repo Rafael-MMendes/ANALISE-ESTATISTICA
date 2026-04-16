@@ -1752,7 +1752,6 @@ def render_drogas_module(data):
         st.markdown("<br>", unsafe_allow_html=True)
 
 def render_cvp_module(data, ano):
-    st.markdown("<h2 style='text-align: center; color: #f0883e !important; margin-bottom: 2rem;'>CVP Geral (Crimes Contra o Patrimônio)</h2>", unsafe_allow_html=True)
     if data.empty:
         st.warning("Nenhum dado encontrado para CVP.")
         return
@@ -1946,13 +1945,7 @@ def render_consolidado_module(ano_selecionado):
     if "cons_view" not in st.session_state:
         st.session_state.cons_view = "Anual"
 
-    st.markdown(f"""
-    <div style="text-align: center; margin-bottom: 5px;">
-        <h2 style="color: #0D3878 !important; margin-bottom: 0px;">📑 Relatório Consolidado</h2>
-        <p style="color: #64748B; font-size: 1rem; margin: 0;">Visão mensal de todos os indicadores - <strong>{ano_selecionado}</strong></p>
-    </div>
-    """, unsafe_allow_html=True)
-    
+
     # Sub-Navegação
     c1, c2 = st.columns(2)
     with c1:
@@ -2036,13 +2029,7 @@ def render_comparativo_module():
     if "comp_view" not in st.session_state:
         st.session_state.comp_view = "Anual"
 
-    st.markdown(f"""
-    <div style="text-align: center; margin-bottom: 5px;">
-        <h2 style='color: #0D3878 !important; margin-bottom: 0px;'>Comparativo de Performance (Ano a Ano)</h2>
-        <p style='color: #64748B; font-size: 1rem; margin: 0;'>Acompanhe a evolução percentual da Criminalidade vs Produtividade Policial.</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
+
     # Sub-Navegação
     c1, c2 = st.columns(2)
     with c1:
@@ -2312,12 +2299,8 @@ def render_home_dashboard(ano_selecionado):
         st.markdown(box_html("Prisões Realizadas", prisoes_atual, prisoes_ant, mes_comp_str, "card-blue"), unsafe_allow_html=True)
         st.markdown(box_html("Maconha Ap. (g)", drogas_mac_atual, drogas_mac_ant, mes_comp_str, "card-purple"), unsafe_allow_html=True)
 
-    # Gráfico de Tendência na Home (Opcional, mas melhora visual)
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.subheader("📊 Tendência Mensal de Criminalidade vs Produtividade")
-    
-    # Plotly Theme Setup
-    st.markdown("""<style> .js-plotly-plot .plotly .modebar { display: none; } </style>""", unsafe_allow_html=True)
+
+
 
 
 # ----------------- MAIN APP LOGIC -----------------
@@ -2431,7 +2414,6 @@ elif nav_sel == "Vida":
     if "vida_indicador" not in st.session_state:
         st.session_state.vida_indicador = "MVI"
 
-    st.markdown("<h2 style='text-align: center; color: #0D3878 !important; margin-bottom: 1rem;'>Crimes contra a Vida</h2>", unsafe_allow_html=True)
 
     cols_vida = st.columns(len(vida_indicadores))
     for i, ind in enumerate(vida_indicadores):
@@ -2482,7 +2464,6 @@ elif nav_sel == "Operacional":
     if "op_indicador" not in st.session_state:
         st.session_state.op_indicador = "Drogas"
 
-    st.markdown("<h2 style='text-align: center; color: #0D3878 !important; margin-bottom: 1rem;'>Indicadores Operacionais</h2>", unsafe_allow_html=True)
 
     cols_btns = st.columns(len(indicadores))
     for i, ind in enumerate(indicadores):
