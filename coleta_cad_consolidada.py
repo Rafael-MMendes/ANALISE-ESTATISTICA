@@ -78,7 +78,7 @@ async def script_coleta_consolidada():
     ]
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False)
+        browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(viewport={'width': 1920, 'height': 1080}, ignore_https_errors=True)
         page = await context.new_page()
         
@@ -97,14 +97,35 @@ async def script_coleta_consolidada():
             log("Verificando se pede Token...")
             await page.wait_for_selector('#token', timeout=15000)
             print("\n" + "="*50)
-            print("🔑 TOKEN REQUERIDO PELO CAD!")
-            print("Se você estiver vendo esta mensagem via agendamento, por favor digite o código.")
+            print("🔑 TOKEN REQUERIDO PELO CAD! (Aguardando input no Dashboard)")
             print("="*50)
-            token = input("Digite o Token do CAD: ").strip()
-            print("="*50 + "\n")
+            
+            # Avisa o dashboard que precisa do token
+            with open("coleta_status.txt", "w", encoding="utf-8") as f:
+                f.write("WAITING_TOKEN")
+            
+            token = ""
+            log("Aguardando Streamlit repassar o token pelo arquivo token_response.txt...")
+            while True:
+                if os.path.exists("token_response.txt"):
+                    with open("token_response.txt", "r", encoding="utf-8") as f:
+                        token = f.read().strip()
+                    os.remove("token_response.txt")
+                    break
+                await asyncio.sleep(2)
+                
+            print("Token recebido com sucesso!")
+            with open("coleta_status.txt", "w", encoding="utf-8") as f:
+                f.write("RUNNING")
+
             await page.fill('#token', token)
             await page.click('input[type="submit"]')
-        except: pass
+            await asyncio.sleep(3)
+        except Exception as e:
+            # Caso não peça token, garante que o status continue
+            with open("coleta_status.txt", "w", encoding="utf-8") as f:
+                f.write("RUNNING")
+            pass
 
         log("Aguardando carregamento do portal principal (Portal de Pesquisa)...")
         try:

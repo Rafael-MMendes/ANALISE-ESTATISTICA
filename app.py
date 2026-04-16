@@ -4,6 +4,20 @@ import numpy as np
 import plotly.express as px
 
 import glob
+import subprocess
+import time
+
+@st.dialog("Autenticação CAD Restrita")
+def open_token_dialog():
+    st.warning("🔑 O robô do CAD solicitou o Token de Segurança.")
+    token_input = st.text_input("Insira o Token do CAD (Cole ou digite):", key="cad_token", max_chars=12)
+    if st.button("Confirmar Autenticação", use_container_width=True):
+        if token_input:
+            with open("token_response.txt", "w", encoding="utf-8") as f:
+                f.write(token_input)
+            with open("coleta_status.txt", "w", encoding="utf-8") as f:
+                f.write("RUNNING_CAD")
+            st.rerun()
 import os
 from io import BytesIO
 import base64
@@ -382,35 +396,40 @@ st.markdown("""
         font-size: 0.85rem !important;
     }
 
-    /* === TABS MODERNAS === */
+    /* === TABS MODERNAS - ESTILO CORPORATIVO MINIMALISTA === */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 4px;
-        background-color: var(--fundo-secundario);
-        border-radius: var(--raio-md);
-        padding: 4px;
-        border: 1px solid var(--borda-clara);
+        gap: 32px;
+        background-color: transparent;
+        padding: 0px 8px;
+        border-bottom: 1px solid var(--borda-clara) !important;
+        border-top: none !important;
+        border-left: none !important;
+        border-right: none !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
     }
     .stTabs [data-baseweb="tab"] {
-        height: 44px;
-        background-color: transparent;
-        border-radius: var(--raio-sm);
-        padding: 10px 20px;
+        height: 54px;
+        background-color: transparent !important;
+        border-radius: 0 !important;
+        padding: 0 4px;
         font-weight: 600;
-        font-size: 0.88rem;
+        font-size: 0.95rem;
         color: var(--texto-secundario);
         border: none !important;
+        border-bottom: 2px solid transparent !important;
+        transition: color 0.2s ease, border-color 0.2s ease;
     }
     .stTabs [data-baseweb="tab"]:hover {
-        background-color: var(--fundo-card);
-        color: var(--texto-principal);
+        background-color: transparent !important;
+        color: var(--azul-pmal);
     }
     .stTabs [aria-selected="true"] {
-        background: var(--fundo-card) !important;
-        color: var(--azul-pmal) !important;
-        box-shadow: var(--sombra-sm);
-        border: none !important;
+        background: transparent !important;
+        color: var(--texto-principal) !important;
+        box-shadow: none !important;
+        border-bottom: 2px solid var(--azul-pmal) !important;
     }
-
     /* === SUBTABS === */
     .stTabs [data-baseweb="tab-panel"] {
         padding-top: 1.5rem;
@@ -783,6 +802,9 @@ def render_header():
                 </div>
                 <div style="color: rgba(255,255,255,0.65); font-size: 0.72rem; font-weight: 400; text-align: right;">
                     Created By 2&#186; Sgt PM Monteiro e 3&#186; Sgt PM Alan Kleber
+                </div>
+                <div style="color: rgba(255,255,255,0.85); font-size: 0.75rem; font-weight: 500; text-align: right; margin-top: 4px;">
+                    Fonte de Dados: NEAC / CAD / Pentaho
                 </div>
             </div>
         </div>
@@ -2406,29 +2428,6 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("""
-    <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; 
-                padding: 16px 18px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
-        <div style="color: #64748B; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; 
-                    letter-spacing: 0.8px; margin-bottom: 8px;">
-            FONTES DE DADOS
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 6px;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <div style="width: 6px; height: 6px; border-radius: 50%; background: #0D3878;"></div>
-                <span style="color: #1E293B; font-size: 0.8rem; font-weight: 500;">NEAC</span>
-            </div>
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <div style="width: 6px; height: 6px; border-radius: 50%; background: #1E5AAF;"></div>
-                <span style="color: #1E293B; font-size: 0.8rem; font-weight: 500;">CAD</span>
-            </div>
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <div style="width: 6px; height: 6px; border-radius: 50%; background: #3B82F6;"></div>
-                <span style="color: #1E293B; font-size: 0.8rem; font-weight: 500;">Pentaho</span>
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
 
     st.markdown("""
     <div style="text-align: center; padding: 12px 0 4px 0; color: #94A3B8; font-size: 0.72rem; line-height: 1.6;">
@@ -2436,6 +2435,57 @@ with st.sidebar:
         Sistema de Gestão de Dados
     </div>
     """, unsafe_allow_html=True)
+
+
+# ---------------- NAVEGAÇÃO E SINC DE DADOS ----------------
+_, col_sync = st.columns([8.5, 1.5])
+
+
+with col_sync:
+    if 'sync_active' not in st.session_state:
+        st.session_state.sync_active = False
+
+    if not st.session_state.sync_active:
+        if st.button("🔄 Sincronizar", use_container_width=True, type="primary"):
+            st.session_state.sync_active = True
+            if __import__('os').path.exists("coleta_status.txt"): __import__('os').remove("coleta_status.txt")
+            if __import__('os').path.exists("token_response.txt"): __import__('os').remove("token_response.txt")
+            if __import__('os').path.exists("coleta_automatica.log"): __import__('os').remove("coleta_automatica.log")
+            
+            st.session_state.sync_proc = __import__('subprocess').Popen(
+                ["cmd.exe", "/c", "Iniciar_Coleta.bat"],
+                cwd=__import__('os').path.dirname(__import__('os').path.abspath(__file__))
+            )
+            with open("coleta_status.txt", "w", encoding="utf-8") as f:
+                f.write("STARTING")
+            st.rerun()
+    else:
+        status = "STARTING"
+        if __import__('os').path.exists("coleta_status.txt"):
+            try:
+                with open("coleta_status.txt", "r", encoding="utf-8") as f:
+                    status = f.read().strip()
+            except: pass
+        
+        if status == "WAITING_TOKEN":
+            st.info("Aguardando Token...")
+            open_token_dialog()
+        elif status == "FINISHED":
+            st.success("✅ Concluído")
+            if st.button("OK", use_container_width=True):
+                st.session_state.sync_active = False
+                if __import__('os').path.exists("coleta_status.txt"): __import__('os').remove("coleta_status.txt")
+                st.rerun()
+        else:
+            st.info(f"⏳ Processando... ({status})")
+            if hasattr(st.session_state, 'sync_proc') and st.session_state.sync_proc.poll() is not None:
+                if status != "FINISHED":
+                    with open("coleta_status.txt", "w", encoding="utf-8") as f:
+                        f.write("FINISHED")
+                    st.rerun()
+            
+            __import__('time').sleep(2.5)
+            st.rerun()
 
 # Navegação Principal por Abas (Tabs) - Layout Moderno
 tab_home, tab_cons, tab_yoy, tab_vida, tab_patrimonio, tab_operacional = st.tabs([
