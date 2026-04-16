@@ -275,7 +275,9 @@ st.markdown("""
     .flag-blue { background-color: var(--azul-bbb); flex: 1; }
 
     .main-header {
-        background: linear-gradient(135deg, var(--azul-pmal) 0%, var(--azul-claro) 100%);
+        background: linear-gradient(135deg, rgba(13,56,120,0.85) 0%, rgba(30,90,175,0.85) 100%);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
         padding: 24px 32px;
         display: flex;
         align-items: center;
@@ -318,7 +320,7 @@ st.markdown("""
     .header-text h1 {
         color: var(--branco) !important;
         font-size: 1.5rem !important;
-        font-weight: 700 !important;
+        font-weight: 900 !important;
         margin: 0 !important;
         letter-spacing: 0.3px;
     }
@@ -398,7 +400,7 @@ st.markdown("""
 
     /* === TABS MODERNAS - ESTILO CORPORATIVO MINIMALISTA === */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 32px;
+        gap: 36px;
         background-color: transparent;
         padding: 0px 8px;
         border-bottom: 1px solid var(--borda-clara) !important;
@@ -407,18 +409,20 @@ st.markdown("""
         border-right: none !important;
         border-radius: 0 !important;
         box-shadow: none !important;
+        margin-bottom: 28px;
     }
     .stTabs [data-baseweb="tab"] {
-        height: 54px;
+        height: 56px;
         background-color: transparent !important;
         border-radius: 0 !important;
-        padding: 0 4px;
+        padding: 0 6px;
         font-weight: 600;
         font-size: 0.95rem;
         color: var(--texto-secundario);
         border: none !important;
         border-bottom: 2px solid transparent !important;
         transition: color 0.2s ease, border-color 0.2s ease;
+        letter-spacing: 0.2px;
     }
     .stTabs [data-baseweb="tab"]:hover {
         background-color: transparent !important;
@@ -426,9 +430,37 @@ st.markdown("""
     }
     .stTabs [aria-selected="true"] {
         background: transparent !important;
-        color: var(--texto-principal) !important;
+        color: var(--azul-pmal) !important;
         box-shadow: none !important;
         border-bottom: 2px solid var(--azul-pmal) !important;
+    }
+
+    /* === ESPAÇAMENTO ENTRE SEÇÕES (GUTTER SYSTEM) === */
+    .stTabs [data-baseweb="tab-panel"] {
+        padding-top: 2rem;
+    }
+    div[data-testid="stMetric"] {
+        margin-bottom: 8px;
+    }
+    div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"],
+    div[data-testid="stVerticalBlock"] > div:has(> [data-testid="stMetric"]) {
+        padding-bottom: 12px;
+    }
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 3rem !important;
+        max-width: 100% !important;
+    }
+    hr {
+        margin: 28px 0 !important;
+    }
+    h2 {
+        margin-top: 1rem !important;
+        margin-bottom: 1.25rem !important;
+    }
+    h3 {
+        margin-top: 0.75rem !important;
+        margin-bottom: 0.75rem !important;
     }
     /* === SUBTABS === */
     .stTabs [data-baseweb="tab-panel"] {
@@ -577,6 +609,8 @@ st.markdown("""
         background: var(--azul-pmal);
         color: var(--branco);
         border-color: var(--azul-pmal);
+        transform: translateY(-3px);
+        box-shadow: var(--sombra-md);
     }
 
     /* === DATAFRAME === */
@@ -698,8 +732,9 @@ st.markdown("""
         border-radius: var(--raio-md);
         padding: 12px 14px;
         font-weight: 600;
-        font-size: 0.78rem;
+        font-size: 0.85rem;
         box-shadow: var(--sombra-xs);
+        transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
         text-align: center;
         white-space: nowrap;
     }
@@ -707,6 +742,8 @@ st.markdown("""
         background: var(--azul-pmal);
         color: var(--branco);
         border-color: var(--azul-pmal);
+        transform: translateY(-3px);
+        box-shadow: var(--sombra-md);
     }
 
     /* === SCROLLBAR CUSTOMIZADA === */
@@ -1981,18 +2018,18 @@ def render_consolidado_module(ano_selecionado):
     </div>
     """, unsafe_allow_html=True)
     
-    # Cartões de Navegação (Estilo Crimes Vida)
+    # Sub-Navegação
     c1, c2 = st.columns(2)
     with c1:
         ativo = st.session_state.cons_view == "Anual"
-        label = f"{'**✓** ' if ativo else ''}📑 Relatório Anual"
-        if st.button(label, key="btn_cons_anual", use_container_width=True):
+        label = f"{'✓ ' if ativo else ''}Relatório Anual"
+        if st.button(label, icon=":material/calendar_month:", key="btn_cons_anual", use_container_width=True):
             st.session_state.cons_view = "Anual"
             st.rerun()
     with c2:
         ativo = st.session_state.cons_view == "Mensal"
-        label = f"{'**✓** ' if ativo else ''}📅 Análise Mensal / Cidade"
-        if st.button(label, key="btn_cons_mensal", use_container_width=True):
+        label = f"{'✓ ' if ativo else ''}Análise Mensal / Cidade"
+        if st.button(label, icon=":material/location_city:", key="btn_cons_mensal", use_container_width=True):
             st.session_state.cons_view = "Mensal"
             st.rerun()
 
@@ -2071,18 +2108,18 @@ def render_comparativo_module():
     </div>
     """, unsafe_allow_html=True)
     
-    # Cartões de Navegação (Estilo Crimes Vida)
+    # Sub-Navegação
     c1, c2 = st.columns(2)
     with c1:
         ativo = st.session_state.comp_view == "Anual"
-        label = f"{'**✓** ' if ativo else ''}⚖️ Comparativo Anual"
-        if st.button(label, key="btn_comp_anual", use_container_width=True):
+        label = f"{'✓ ' if ativo else ''}Comparativo Anual"
+        if st.button(label, icon=":material/balance:", key="btn_comp_anual", use_container_width=True):
             st.session_state.comp_view = "Anual"
             st.rerun()
     with c2:
         ativo = st.session_state.comp_view == "Mensal"
-        label = f"{'**✓** ' if ativo else ''}➕ Análise Temporal Personalizada"
-        if st.button(label, key="btn_comp_mensal", use_container_width=True):
+        label = f"{'✓ ' if ativo else ''}Análise Temporal Personalizada"
+        if st.button(label, icon=":material/tune:", key="btn_comp_mensal", use_container_width=True):
             st.session_state.comp_view = "Mensal"
             st.rerun()
 
@@ -2438,7 +2475,7 @@ with col_sync:
         st.session_state.sync_active = False
 
     if not st.session_state.sync_active:
-        if st.button("🔄 Sincronizar", use_container_width=True, type="primary"):
+        if st.button("Sincronizar", icon=":material/sync:", use_container_width=True, type="primary"):
             st.session_state.sync_active = True
             if __import__('os').path.exists("coleta_status.txt"): __import__('os').remove("coleta_status.txt")
             if __import__('os').path.exists("token_response.txt"): __import__('os').remove("token_response.txt")
@@ -2479,32 +2516,52 @@ with col_sync:
             __import__('time').sleep(2.5)
             st.rerun()
 
-# Navegação Principal por Abas (Tabs) - Layout Moderno
-tab_home, tab_cons, tab_yoy, tab_vida, tab_patrimonio, tab_operacional = st.tabs([
-    "🏠 Início", 
-    "📑 Consolidado", 
-    "📈 Comparativo", 
-    "⚖️ Crimes Vida", 
-    "🏘️ Patrimônio", 
-    "🛡️ Operacional"
-])
+# ---------------- NAVEGAÇÃO PRINCIPAL (Botões com Material Icons) ----------------
+nav_abas = [
+    {"key": "Inicio",       "label": "Início",        "icon": ":material/home:"},
+    {"key": "Consolidado",  "label": "Consolidado",   "icon": ":material/summarize:"},
+    {"key": "Comparativo",  "label": "Comparativo",   "icon": ":material/trending_up:"},
+    {"key": "Vida",         "label": "Crimes Vida",   "icon": ":material/favorite:"},
+    {"key": "Patrimonio",   "label": "Patrimônio",    "icon": ":material/account_balance_wallet:"},
+    {"key": "Operacional",  "label": "Operacional",   "icon": ":material/shield:"},
+]
 
-with tab_home:
+if "nav_aba" not in st.session_state:
+    st.session_state.nav_aba = "Inicio"
+
+nav_cols = st.columns(len(nav_abas))
+for i, aba in enumerate(nav_abas):
+    with nav_cols[i]:
+        ativo = st.session_state.nav_aba == aba["key"]
+        label = f"{'✓ ' if ativo else ''}{aba['label']}"
+        if st.button(label, icon=aba["icon"], key=f"nav_btn_{aba['key']}", use_container_width=True):
+            st.session_state.nav_aba = aba["key"]
+            st.rerun()
+
+st.markdown("---")
+
+nav_sel = st.session_state.nav_aba
+
+# -------------------- INÍCIO --------------------
+if nav_sel == "Inicio":
     render_home_dashboard(ano_selecionado)
 
-with tab_cons:
+# -------------------- CONSOLIDADO --------------------
+elif nav_sel == "Consolidado":
     render_consolidado_module(ano_selecionado)
 
-with tab_yoy:
+# -------------------- COMPARATIVO --------------------
+elif nav_sel == "Comparativo":
     render_comparativo_module()
 
-with tab_vida:
+# -------------------- CRIMES VIDA --------------------
+elif nav_sel == "Vida":
     vida_indicadores = [
-        {"key": "MVI", "label": "MVI Geral", "emoji": "📊"},
-        {"key": "Analitico", "label": "Analítico MVI", "emoji": "📋"},
-        {"key": "Tentativa", "label": "Tentativa de MVI", "emoji": "⚠️"},
-        {"key": "AnaliticoTentativa", "label": "Analítico Tentativa", "emoji": "📋"},
-        {"key": "CVLI", "label": "CVLI", "emoji": "📉"},
+        {"key": "MVI",              "label": "MVI Geral",          "icon": ":material/bar_chart:"},
+        {"key": "Analitico",        "label": "Analítico MVI",      "icon": ":material/assignment:"},
+        {"key": "Tentativa",        "label": "Tentativa de MVI",   "icon": ":material/warning:"},
+        {"key": "AnaliticoTentativa","label": "Analítico Tentativa","icon": ":material/find_in_page:"},
+        {"key": "CVLI",             "label": "CVLI",               "icon": ":material/monitoring:"},
     ]
 
     if "vida_indicador" not in st.session_state:
@@ -2516,49 +2573,46 @@ with tab_vida:
     for i, ind in enumerate(vida_indicadores):
         with cols_vida[i]:
             ativo = st.session_state.vida_indicador == ind["key"]
-            btn_label = f"{'**✓** ' if ativo else ''}{ind['emoji']} {ind['label']}"
-            if st.button(btn_label, key=f"vida_btn_{ind['key']}", use_container_width=True):
+            btn_label = f"{'✓ ' if ativo else ''}{ind['label']}"
+            if st.button(btn_label, icon=ind['icon'], key=f"vida_btn_{ind['key']}", use_container_width=True):
                 st.session_state.vida_indicador = ind["key"]
 
     st.markdown("---")
 
     vida_sel = st.session_state.vida_indicador
     if vida_sel == "MVI":
-        df_mvi = load_data_mvi('MVI', ano_selecionado)
-        render_mvi_module(df_mvi, "Estatísticas de MVI", ano_selecionado)
+        render_mvi_module(load_data_mvi('MVI', ano_selecionado), "Estatísticas de MVI", ano_selecionado)
     elif vida_sel == "Analitico":
-        df_mvi = load_data_mvi('MVI', ano_selecionado)
-        render_analitico_mvi(df_mvi, "Analítico de MVI", ano_selecionado)
+        render_analitico_mvi(load_data_mvi('MVI', ano_selecionado), "Analítico de MVI", ano_selecionado)
     elif vida_sel == "CVLI":
-        df_cvli = load_data_cvli('MVI', ano_selecionado)
-        render_mvi_module(df_cvli, "Estatísticas de CVLI", ano_selecionado)
+        render_mvi_module(load_data_cvli('MVI', ano_selecionado), "Estatísticas de CVLI", ano_selecionado)
     elif vida_sel == "Tentativa":
-        df_tentativa = load_data_mvi('Tentativa', ano_selecionado)
-        render_mvi_module(df_tentativa, "Estatísticas de Tentativa de MVI", ano_selecionado)
+        render_mvi_module(load_data_mvi('Tentativa', ano_selecionado), "Estatísticas de Tentativa de MVI", ano_selecionado)
     elif vida_sel == "AnaliticoTentativa":
-        df_tentativa = load_data_mvi('Tentativa', ano_selecionado)
-        render_analitico_mvi(df_tentativa, "Analítico de Tentativa de MVI", ano_selecionado)
+        render_analitico_mvi(load_data_mvi('Tentativa', ano_selecionado), "Analítico de Tentativa de MVI", ano_selecionado)
 
-with tab_patrimonio:
+# -------------------- PATRIMÔNIO --------------------
+elif nav_sel == "Patrimonio":
     try:
         df_cvp = load_data_cvp('CVP', ano_selecionado)
         if df_cvp.empty:
-            st.warning(f"⚠️ Nenhum dado de CVP encontrado para {ano_selecionado}. Verifique se o arquivo 'CVP Geral {ano_selecionado}.xls' existe na pasta dados/{ano_selecionado}/.")
+            st.warning(f"⚠️ Nenhum dado de CVP encontrado para {ano_selecionado}.")
         else:
             render_cvp_module(df_cvp, ano_selecionado)
     except Exception as e:
         st.error(f"Erro ao carregar Patrimônio: {e}")
 
-with tab_operacional:
+# -------------------- OPERACIONAL --------------------
+elif nav_sel == "Operacional":
     indicadores = [
-        {"key": "Drogas", "label": "Drogas Apreendidas", "emoji": "🧪", "color": "card-purple"},
-        {"key": "Armas", "label": "Armas Apreendidas", "emoji": "🛡️", "color": "card-orange"},
-        {"key": "Prisoes", "label": "Prisões", "emoji": "⚖️", "color": "card-blue"},
-        {"key": "Veiculos", "label": "Veículos Recuperados", "emoji": "🔍", "color": "card-green"},
-        {"key": "MariaDaPenha", "label": "Maria da Penha", "emoji": "🏛️", "color": "card-red"},
-        {"key": "TCO", "label": "TCO", "emoji": "📑", "color": "card-blue"},
-        {"key": "Mandados", "label": "Mandados de Prisão", "emoji": "📋", "color": "card-orange"},
-        {"key": "Visita", "label": "Visita Comunitária", "emoji": "🏘️", "color": "card-green"},
+        {"key": "Drogas",       "label": "Drogas Apreendidas",    "icon": ":material/science:"},
+        {"key": "Armas",        "label": "Armas Apreendidas",     "icon": ":material/shield:"},
+        {"key": "Prisoes",      "label": "Prisões",               "icon": ":material/gavel:"},
+        {"key": "Veiculos",     "label": "Veículos Recuperados",  "icon": ":material/search:"},
+        {"key": "MariaDaPenha", "label": "Maria da Penha",        "icon": ":material/account_balance:"},
+        {"key": "TCO",          "label": "TCO",                   "icon": ":material/description:"},
+        {"key": "Mandados",     "label": "Mandados de Prisão",    "icon": ":material/assignment_ind:"},
+        {"key": "Visita",       "label": "Visita Comunitária",    "icon": ":material/holiday_village:"},
     ]
 
     if "op_indicador" not in st.session_state:
@@ -2570,8 +2624,8 @@ with tab_operacional:
     for i, ind in enumerate(indicadores):
         with cols_btns[i]:
             ativo = st.session_state.op_indicador == ind["key"]
-            btn_label = f"{'**✓** ' if ativo else ''}{ind['emoji']} {ind['label']}"
-            if st.button(btn_label, key=f"op_btn_{ind['key']}", use_container_width=True):
+            btn_label = f"{'✓ ' if ativo else ''}{ind['label']}"
+            if st.button(btn_label, icon=ind['icon'], key=f"op_btn_{ind['key']}", use_container_width=True):
                 st.session_state.op_indicador = ind["key"]
 
     st.markdown("---")
@@ -2579,29 +2633,21 @@ with tab_operacional:
     op_sel = st.session_state.op_indicador
     try:
         if op_sel == "Drogas":
-            df_drogas = load_data_drogas('Drogas', ano_selecionado)
-            render_drogas_module(df_drogas)
+            render_drogas_module(load_data_drogas('Drogas', ano_selecionado))
         elif op_sel == "Armas":
-            df_armas = load_data_armas('Armas', ano_selecionado)
-            render_mvi_module(df_armas, "Estatísticas de Armas Apreendidas", ano_selecionado)
+            render_mvi_module(load_data_armas('Armas', ano_selecionado), "Estatísticas de Armas Apreendidas", ano_selecionado)
         elif op_sel == "Prisoes":
-            df_prisoes = load_data_prisoes('Pris', ano_selecionado)
-            render_mvi_module(df_prisoes, "Estatísticas de Prisões", ano_selecionado)
+            render_mvi_module(load_data_prisoes('Pris', ano_selecionado), "Estatísticas de Prisões", ano_selecionado)
         elif op_sel == "Veiculos":
-            df_veiculos = load_data_veiculos('Recuperado', ano_selecionado)
-            render_mvi_module(df_veiculos, "Estatísticas de Veículos Recuperados", ano_selecionado)
+            render_mvi_module(load_data_veiculos('Recuperado', ano_selecionado), "Estatísticas de Veículos Recuperados", ano_selecionado)
         elif op_sel == "MariaDaPenha":
-            df_mariap = load_data_maria_da_penha('Maria da Penha', ano_selecionado)
-            render_mvi_module(df_mariap, "Estatísticas de Violência Doméstica (Maria da Penha)", ano_selecionado)
+            render_mvi_module(load_data_maria_da_penha('Maria da Penha', ano_selecionado), "Estatísticas de Violência Doméstica (Maria da Penha)", ano_selecionado)
         elif op_sel == "TCO":
-            df_tco = load_data_tco('TCO', ano_selecionado)
-            render_mvi_module(df_tco, "Estatísticas de Termo Circunstanciado (TCO)", ano_selecionado)
+            render_mvi_module(load_data_tco('TCO', ano_selecionado), "Estatísticas de Termo Circunstanciado (TCO)", ano_selecionado)
         elif op_sel == "Mandados":
-            df_mandados = load_data_mandados('Mandado', ano_selecionado)
-            render_mvi_module(df_mandados, "Estatísticas de Cumprimento de Mandados", ano_selecionado)
+            render_mvi_module(load_data_mandados('Mandado', ano_selecionado), "Estatísticas de Cumprimento de Mandados", ano_selecionado)
         elif op_sel == "Visita":
-            df_visita = load_data_visita('Visita Comun', ano_selecionado)
-            render_mvi_module(df_visita, "Estatísticas de Visita Comunitária", ano_selecionado)
+            render_mvi_module(load_data_visita('Visita Comun', ano_selecionado), "Estatísticas de Visita Comunitária", ano_selecionado)
     except Exception as e:
         st.error(f"Erro ao carregar indicador operacional: {e}")
 
