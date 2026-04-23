@@ -1387,7 +1387,7 @@ def load_data_drogas(keyword, ano):
         df = df[df['Cidade'].isin(cidades_9bpm)]
         
         # Converter Quantidade para numérico (Gramas)
-        df['Quantidade'] = pd.to_numeric(df['Quantidade'], errors='coerce').fillna(0.0)
+        df['Quantidade'] = pd.to_numeric(df['Quantidade'], errors='coerce').fillna(0)
         
         # Padronizar Tipos
         if 'Tipo' in df.columns:
@@ -1868,13 +1868,13 @@ def render_drogas_module(data):
             continue
             
         resumo = df_droga.groupby(['Cidade', 'Mês', 'Mes_Num'])['Quantidade'].sum().reset_index()
-        pivot = resumo.pivot(index='Cidade', columns='Mês', values='Quantidade').fillna(0).round(1)
+        pivot = resumo.pivot(index='Cidade', columns='Mês', values='Quantidade').fillna(0).round(0).astype(int)
 
         meses_pt = {1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril', 5: 'Maio', 6: 'Junho', 
                     7: 'Julho', 8: 'Agosto', 9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'}
         for mes_num, mes_nome in meses_pt.items():
             if mes_nome not in pivot.columns:
-                pivot[mes_nome] = 0.0
+                pivot[mes_nome] = 0
 
         cols_presentes = list(meses_pt.values())
         pivot = pivot[cols_presentes]
@@ -2022,7 +2022,7 @@ def get_consolidado_data(ano, cidade_sel="Todas"):
             
             for m, total in agg.items():
                 if m in counts:
-                    counts[m] = float(total) if is_sum else int(total)
+                    counts[m] = int(round(total))
                     
         counts['Indicador'] = row_name
         return counts
@@ -2072,7 +2072,7 @@ def get_consolidado_data(ano, cidade_sel="Todas"):
             dados_consolidados.append(get_monthly_counts(df_droga_f, f'Drogas Apreendidas - {droga} (g)', is_sum=True))
     else:
         for droga in ['Maconha', 'Cocaína', 'Crack']:
-            dados_consolidados.append({**{m: 0.0 for m in meses_ordem}, 'Indicador': f'Drogas Apreendidas - {droga} (g)'})
+            dados_consolidados.append({**{m: 0 for m in meses_ordem}, 'Indicador': f'Drogas Apreendidas - {droga} (g)'})
             
     # CVP Geral (BPM Global)
     df_cvp = load_data_cvp('CVP', ano)
