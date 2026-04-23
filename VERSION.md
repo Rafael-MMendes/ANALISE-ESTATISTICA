@@ -6,6 +6,16 @@ O formato é baseado em [Versionamento Semântico (SemVer)](https://semver.org/l
 
 ---
 
+## [2.0.2] - 2026-04-22
+
+### [Alterado]
+- **Otimização da Barra de Navegação:** Unificação do seletor de Ano de Referência e do botão Sincronizar na mesma linha horizontal que as abas de fluxo (1 única linha composta por 8 itens), mitigando o desperdício de espaço vertical no cabeçalho.
+- **Visualização Gráfica:** Conversão de todos os gráficos em linha referentes à "Evolução Mensal" (`px.line`) para o formato de barra vertical analítica (`px.bar`), ostentando os dados numéricos de ocorrência projetados dinamicamente no topo de cada correspondência do eixo temporal.
+- **Hierarquia de Dados de Fluxo:** Reversão profunda de layout nas abas principais ("Consolidado/Operacional MVI", "Analítico MVI" e "Patrimônio/CVP") a fim de renderizar inicialmente as Listagens Nominais e/ou Matrizes quantitativas antes das suas contrapartes gráficas de visualização de performance.
+- **Iconografia Embutida:** Fixação tipográfica de Material Design contornando o Markdown Parsing; agora o campo do "Painel de Indicadores" no cabeçalho integra o ícone através de injeção pura de tag e `fonts.googleapis`.
+
+---
+
 ## [2.0.1] - 2026-04-22
 
 ### [Alterado]

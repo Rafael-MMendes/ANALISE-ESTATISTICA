@@ -223,6 +223,8 @@ st.set_page_config(
 # Custom CSS - Light Modern Theme (9º BPM PMAL)
 st.markdown("""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0');
+    
     /* === VARIÁVEIS DE COR === */
     :root {
         --azul-pmal: #0D3878;
@@ -1467,7 +1469,7 @@ def _render_bar_chart(df, y_col, x_col, title=""):
     return fig
 
 def render_mvi_module(data, title, ano):
-    st.markdown(f"<h2 style='text-align: center; color: #0D3878 !important; margin-bottom: 2rem;'>{title}</h2>", unsafe_allow_html=True)
+    st.markdown(f"<h2 style='text-align: center; color: #0D3878 !important; margin-bottom: 2rem; display: flex; justify-content: center; align-items: center; gap: 8px;'><span class='material-symbols-rounded' style='font-size: 2.2rem;'>label</span> {title}</h2>", unsafe_allow_html=True)
     if data.empty:
         st.warning("Nenhum dado encontrado.")
         return
@@ -1485,7 +1487,7 @@ def render_mvi_module(data, title, ano):
 
     st.markdown("<br><hr style='border-color: #E2E8F0;'><br>", unsafe_allow_html=True)
 
-    st.markdown("<h3>Matriz de Ocorrências (Cidade x Mês)</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: #0D3878 !important; margin-bottom: 5px; display: flex; align-items: center; gap: 8px;'><span class='material-symbols-rounded' style='font-size: 1.8rem;'>table_chart</span> Matriz de Ocorrências (Cidade x Mês)</h3>", unsafe_allow_html=True)
     resumo = data.groupby(['Cidade', 'Mês', 'Mes_Num']).size().reset_index(name='Quantidade')
     pivot = resumo.pivot(index='Cidade', columns='Mês', values='Quantidade').fillna(0).astype(int)
 
@@ -1509,7 +1511,7 @@ def render_mvi_module(data, title, ano):
 
     col_chart1, col_chart2 = st.columns(2)
     with col_chart1:
-        st.markdown(f"<h3>Total por Cidade</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='color: #0D3878 !important; margin-bottom: 5px; display: flex; align-items: center; gap: 8px;'><span class='material-symbols-rounded' style='font-size: 1.8rem;'>map</span> Total por Cidade</h3>", unsafe_allow_html=True)
         mvi_por_cidade = data['Cidade'].value_counts().reset_index()
         mvi_por_cidade.columns = ['Cidade', 'Quantidade']
         mvi_por_cidade = mvi_por_cidade.sort_values(by='Quantidade', ascending=True)
@@ -1518,7 +1520,7 @@ def render_mvi_module(data, title, ano):
         st.plotly_chart(fig1, use_container_width=True)
 
     with col_chart2:
-        st.markdown("<h3>Evolução Mensal</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color: #0D3878 !important; margin-bottom: 5px; display: flex; align-items: center; gap: 8px;'><span class='material-symbols-rounded' style='font-size: 1.8rem;'>monitoring</span> Evolução Mensal</h3>", unsafe_allow_html=True)
         mvi_por_mes = data.groupby(['Mes_Num', 'Mês']).size().reset_index(name='Quantidade')
         mvi_por_mes = mvi_por_mes.sort_values(by='Mes_Num')
 
@@ -1530,7 +1532,7 @@ def render_mvi_module(data, title, ano):
     st.markdown("<br><hr style='border-color: #E2E8F0;'><br>", unsafe_allow_html=True)
     
     # --- Botões de Exportação Separados ---
-    st.markdown("<h3>📥 Exportar Relatório</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: #0D3878 !important; margin-bottom: 5px; display: flex; align-items: center; gap: 8px;'><span class='material-symbols-rounded' style='font-size: 1.8rem;'>download</span> Exportar Relatório</h3>", unsafe_allow_html=True)
     
     df_export = pivot.reset_index()
     excel_data = convert_df_to_excel(df_export)
@@ -1563,7 +1565,7 @@ def render_mvi_module(data, title, ano):
 def render_analitico_mvi(data, title, ano):
     st.markdown(f"""
     <div style="text-align: center; margin-bottom: 25px;">
-        <h2 style="color: #0D3878 !important; margin-bottom: 5px;">{title}</h2>
+        <h2 style='text-align: center; color: #0D3878 !important; margin-bottom: 2rem; display: flex; justify-content: center; align-items: center; gap: 8px;'><span class='material-symbols-rounded' style='font-size: 2.2rem;'>label</span> {title}</h2>
         <p style="color: #64748B; font-size: 1.1rem;">Análise detalhada de ocorrências e perfil das vítimas - <strong>{ano}</strong></p>
     </div>
     """, unsafe_allow_html=True)
@@ -1673,7 +1675,7 @@ def render_analitico_mvi(data, title, ano):
         )
 
 def render_drogas_module(data):
-    st.markdown("        <h2 style='text-align: center; color: #0D3878 !important; margin-bottom: 2rem;'>Estatísticas de Drogas Apreendidas (Gramas)</h2>", unsafe_allow_html=True)
+    st.markdown("        <h2 style='text-align: center; color: #0D3878 !important; margin-bottom: 2rem; display: flex; justify-content: center; align-items: center; gap: 8px;'><span class='material-symbols-rounded' style='font-size: 2.2rem;'>query_stats</span> Estatísticas de Drogas Apreendidas (Gramas)</h2>", unsafe_allow_html=True)
     if data.empty:
         st.warning("Nenhum dado encontrado para Drogas.")
         return
@@ -1699,7 +1701,7 @@ def render_drogas_module(data):
     cores = {'Maconha': '#3fb950', 'Cocaína': '#f0f6fc', 'Crack': '#d29922'}
 
     for droga in drogas_alvo:
-        st.markdown(f"<h3>Matriz de Ocorrências: {droga} (g)</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='color: #0D3878 !important; margin-bottom: 5px; display: flex; align-items: center; gap: 8px;'><span class='material-symbols-rounded' style='font-size: 1.8rem;'>table_chart</span> Matriz de Ocorrências: {droga} (g)</h3>", unsafe_allow_html=True)
         df_droga = data[data['Cat_Droga'] == droga]
         
         if df_droga.empty:
@@ -1775,7 +1777,7 @@ def render_cvp_module(data, ano):
     
     st.markdown("<br><hr style='border-color: #E2E8F0;'><br>", unsafe_allow_html=True)
 
-    st.markdown("<h3>Matriz de CVP por Natureza</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: #0D3878 !important; margin-bottom: 5px; display: flex; align-items: center; gap: 8px;'><span class='material-symbols-rounded' style='font-size: 1.8rem;'>table_chart</span> Matriz de CVP por Natureza</h3>", unsafe_allow_html=True)
     
     # Adicionar TOTAL GERAL na matriz
     df_exibicao = data.copy()
@@ -1794,13 +1796,13 @@ def render_cvp_module(data, ano):
     st.markdown("<br><hr style='border-color: #E2E8F0;'><br>", unsafe_allow_html=True)
     col_chart1, col_chart2 = st.columns(2)
     with col_chart1:
-        st.markdown(f"<h3>Ocorrências por Natureza</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='color: #0D3878 !important; margin-bottom: 5px; display: flex; align-items: center; gap: 8px;'><span class='material-symbols-rounded' style='font-size: 1.8rem;'>donut_large</span> Ocorrências por Natureza</h3>", unsafe_allow_html=True)
         df_natureza = data[['NATUREZA', 'TOTAL']].sort_values(by='TOTAL', ascending=True)
         fig1 = _render_bar_chart(df_natureza, 'NATUREZA', 'TOTAL')
         st.plotly_chart(fig1, use_container_width=True)
 
     with col_chart2:
-        st.markdown("<h3>Evolução Mensal Macro</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color: #0D3878 !important; margin-bottom: 5px; display: flex; align-items: center; gap: 8px;'><span class='material-symbols-rounded' style='font-size: 1.8rem;'>monitoring</span> Evolução Mensal Macro</h3>", unsafe_allow_html=True)
         df_meses = pd.DataFrame({'Mês': meses_cols, 'Quantidade': totais_por_mes.values})
         fig2 = px.bar(df_meses, x='Mês', y='Quantidade', text='Quantidade')
         fig2.update_traces(marker_color='#F59E0B', textposition='outside', textfont_size=12)
@@ -2197,9 +2199,8 @@ def render_comparativo_module():
 
 def render_home_dashboard(ano_selecionado):
     st.markdown(f"""
-    <style>@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0');</style>
     <div style="text-align: center; margin-bottom: 25px;">
-        <h2 style="color: #0D3878 !important; margin-bottom: 5px; display: flex; justify-content: center; align-items: center; gap: 8px;"><span class="material-symbols-rounded" style="font-size: 2.2rem;">dashboard</span> Painel de Indicadores</h2>
+        <h2 style='text-align: center; color: #0D3878 !important; margin-bottom: 2rem; display: flex; justify-content: center; align-items: center; gap: 8px;'><span class='material-symbols-rounded' style='font-size: 2.2rem;'>dashboard</span> Painel de Indicadores</h2>
         <p style="color: #64748B; font-size: 1rem; margin: 0;">Ano de Referência: <strong>{ano_selecionado}</strong></p>
     </div>
     """, unsafe_allow_html=True)
