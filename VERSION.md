@@ -6,6 +6,24 @@ O formato é baseado em [Versionamento Semântico (SemVer)](https://semver.org/l
 
 ---
 
+## [2.0.3] - 2026-04-22
+
+### [Adicionado]
+- **Componente `_render_kpi_card()`:** Novo componente HTML/CSS premium que substitui todos os `st.metric()` e a função legada `box_html()`. Características:
+  - Tipografia **Inter** com label em cinza (`#6B7280`), valor em bold (`700`) e sublabel separado por linha fina.
+  - Ícone **Material Symbols Rounded** no canto superior direito com opacidade discreta.
+  - Borda lateral esquerda colorida (`4px`) por categoria semântica (vermelho, azul, âmbar, verde, violeta).
+  - Sombra suave (`box-shadow`) em substituição a bordas sólidas.
+  - Efeito hover com elevação (`translateY(-3px)`) e sombra aprofundada.
+  - Altura fixa (`130px`) garantindo alinhamento uniforme entre cards com e sem sublabel.
+
+### [Alterado]
+- **Aba Início:** Substituição da função `box_html()` e suas classes CSS customizadas pelos novos `_render_kpi_card()`, com sublabels de delta comparativo (↑/↓ vs mês anterior) e lógica de cor contextual (vermelho para crimes, verde para operacional).
+- **Ícones de subtítulos:** Migração global do `@import` da fonte `Material Symbols Rounded` da função `render_home_dashboard` para o bloco CSS raiz (`<style>` global), garantindo disponibilidade em todas as abas sem recarregamento.
+- **Uniformização visual:** Todas as abas (MVI, Analítico MVI, CVP/Patrimônio, Drogas e Início) utilizam agora o mesmo padrão de card de KPI.
+
+---
+
 ## [2.0.2] - 2026-04-22
 
 ### [Alterado]

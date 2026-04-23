@@ -225,6 +225,26 @@ st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0');
     
+    /* === EQUALIZAÇÃO DE ALTURA DOS KPI CARDS === */
+    /* Força colunas Streamlit a alinharem filhos com mesma altura */
+    [data-testid="column"] {
+        display: flex !important;
+        flex-direction: column !important;
+    }
+    [data-testid="column"] > div:first-child {
+        flex: 1 !important;
+        display: flex !important;
+        flex-direction: column !important;
+    }
+    [data-testid="column"] > div:first-child > div[data-testid="stMarkdownContainer"] {
+        flex: 1 !important;
+        display: flex !important;
+        flex-direction: column !important;
+    }
+    [data-testid="column"] > div:first-child > div[data-testid="stMarkdownContainer"] > div[id^="kpi_"] {
+        flex: 1 !important;
+    }
+
     /* === VARIÁVEIS DE COR === */
     :root {
         --azul-pmal: #0D3878;
@@ -746,8 +766,8 @@ def _img_to_base64(path):
     return ""
 
 def render_header():
-    logo_9bpm_b64 = _img_to_base64("brasao_9bpm.png")
-    logo_municipio_b64 = _img_to_base64("brasao_municipio.png")
+    logo_9bpm_b64 = _img_to_base64("assets/brasao_9bpm.png")
+    logo_municipio_b64 = _img_to_base64("assets/brasao_municipio.png")
 
     logo_9bpm_img = f'<img src="data:image/png;base64,{logo_9bpm_b64}" alt="9º BPM">' if logo_9bpm_b64 else ""
     logo_municipio_img = f'<img src="data:image/png;base64,{logo_municipio_b64}" alt="Município">' if logo_municipio_b64 else ""
@@ -1451,6 +1471,82 @@ def _apply_table_style(df, highlight_row=None):
     return styler
 
 
+def _render_kpi_card(label: str, value: str, sublabel: str = "", icon: str = "analytics", accent: str = "#0D3878", delta_negative: bool = False):
+    """Renderiza um card de KPI premium com ícone, tipografia refinada e efeito hover."""
+    uid = f"kpi_{hash(label + value) & 0xFFFFFF}"
+    sublabel_color = "#EF4444" if delta_negative and sublabel else "#6B7280"
+    sublabel_html = f'<p class="kpi-sub" style="color:{sublabel_color};">{sublabel}</p>' if sublabel else ""
+    st.markdown(f"""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    #{uid} {{
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 20px 22px 18px 22px;
+        border-left: 4px solid {accent};
+        box-shadow: 0 2px 8px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.06);
+        transition: transform 0.18s ease, box-shadow 0.18s ease;
+        font-family: 'Inter', sans-serif;
+        position: relative;
+        overflow: hidden;
+        margin-bottom: 4px;
+        height: 130px;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }}
+    #{uid}:hover {{
+        transform: translateY(-3px);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.13);
+    }}
+    #{uid} .kpi-header {{
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 6px;
+    }}
+    #{uid} .kpi-label {{
+        font-size: 0.78rem;
+        font-weight: 500;
+        color: #6B7280;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        line-height: 1.3;
+    }}
+    #{uid} .kpi-icon {{
+        font-size: 1.35rem;
+        color: {accent};
+        opacity: 0.55;
+        user-select: none;
+    }}
+    #{uid} .kpi-value {{
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #111827;
+        line-height: 1;
+        margin: 4px 0 6px 0;
+        letter-spacing: -0.02em;
+    }}
+    #{uid} .kpi-sub {{
+        font-size: 0.72rem;
+        font-weight: 500;
+        margin: 0;
+        padding-top: 4px;
+        border-top: 1px solid #F3F4F6;
+    }}
+    </style>
+    <div id="{uid}">
+        <div class="kpi-header">
+            <span class="kpi-label">{label}</span>
+            <span class="kpi-icon material-symbols-rounded">{icon}</span>
+        </div>
+        <div class="kpi-value">{value}</div>
+        {sublabel_html}
+    </div>
+    """, unsafe_allow_html=True)
+
+
 def _render_bar_chart(df, y_col, x_col, title=""):
     """Renderiza grafico de barras horizontal com escala verde (baixo) -> vermelho (alto)."""
     fig = px.bar(
@@ -1481,9 +1577,9 @@ def render_mvi_module(data, title, ano):
     mvi_mes_critico = data['Mês'].value_counts().iloc[0] if not data.empty else 0
 
     col1, col2, col3 = st.columns(3)
-    with col1: st.metric(f"Total de {title}", f"{total_mvi}")
-    with col2: st.metric("Cidade mais Afetada", f"{cidade_critica}", f"{mvi_cidade_critica} casos", delta_color="inverse")
-    with col3: st.metric("Mês mais Crítico", f"{mes_critico}", f"{mvi_mes_critico} casos", delta_color="inverse")
+    with col1: _render_kpi_card(f"Total de {title}", f"{total_mvi}", icon="bar_chart", accent="#0D3878")
+    with col2: _render_kpi_card("Cidade mais Afetada", f"{cidade_critica}", sublabel=f"📍 {mvi_cidade_critica} ocorrências", icon="location_city", accent="#1E5AAF", delta_negative=True)
+    with col3: _render_kpi_card("Mês mais Crítico", f"{mes_critico}", sublabel=f"📅 {mvi_mes_critico} ocorrências", icon="calendar_month", accent="#F59E0B", delta_negative=True)
 
     st.markdown("<br><hr style='border-color: #E2E8F0;'><br>", unsafe_allow_html=True)
 
@@ -1594,19 +1690,19 @@ def render_analitico_mvi(data, title, ano):
     # KPI Rápido
     st.markdown("---")
     res_c1, res_c2, res_c3, res_c4 = st.columns(4)
-    res_c1.metric("Ocorrências Filtradas", len(df_filtrado))
-    res_c2.metric("Bairros Distintos", df_filtrado['Bairro'].nunique())
+    with res_c1: _render_kpi_card("Ocorrências Filtradas", str(len(df_filtrado)), icon="bar_chart", accent="#0D3878")
+    with res_c2: _render_kpi_card("Bairros Distintos", str(df_filtrado['Bairro'].nunique()), icon="map", accent="#1E5AAF")
     
     # Idade média
     try:
         idade_media = pd.to_numeric(df_filtrado['Idade'], errors='coerce').mean()
-        res_c3.metric("Idade Média", f"{idade_media:.1f}" if pd.notna(idade_media) else "N/A")
+        with res_c3: _render_kpi_card("Idade Média", f"{idade_media:.1f}" if pd.notna(idade_media) else "N/A", icon="person", accent="#7C3AED")
     except:
-        res_c3.metric("Idade Média", "N/A")
+        with res_c3: _render_kpi_card("Idade Média", "N/A", icon="person", accent="#7C3AED")
         
     # Perfil Principal (Tipo de Morte ou Instrumento para Tentativa)
     natureza_col = 'Tipo de Morte' if 'Tipo de Morte' in df_filtrado.columns else ('Instrumento' if 'Instrumento' in df_filtrado.columns else 'Natureza')
-    res_c4.metric("Natureza Principal", df_filtrado[natureza_col].mode()[0] if not df_filtrado.empty and natureza_col in df_filtrado.columns else "N/A")
+    with res_c4: _render_kpi_card("Natureza Principal", df_filtrado[natureza_col].mode()[0] if not df_filtrado.empty and natureza_col in df_filtrado.columns else "N/A", icon="gavel", accent="#DC2626")
 
     # Gráficos Analíticos
     st.markdown("<br>", unsafe_allow_html=True)
@@ -1691,9 +1787,9 @@ def render_drogas_module(data):
     tot_crack = data[data['Cat_Droga'] == 'Crack']['Quantidade'].sum()
 
     col1, col2, col3 = st.columns(3)
-    with col1: st.metric("Maconha (Gramas)", f"{tot_maconha:,.0f}g")
-    with col2: st.metric("Cocaína (Gramas)", f"{tot_cocaina:,.0f}g")
-    with col3: st.metric("Crack (Gramas)", f"{tot_crack:,.0f}g")
+    with col1: _render_kpi_card("Maconha Apreendida", f"{tot_maconha:,.0f}g", icon="grass", accent="#16A34A")
+    with col2: _render_kpi_card("Cocaína Apreendida", f"{tot_cocaina:,.0f}g", icon="warning", accent="#DC2626")
+    with col3: _render_kpi_card("Crack Apreendido", f"{tot_crack:,.0f}g", icon="local_fire_department", accent="#D97706")
 
     st.markdown("<br><hr style='border-color: #E2E8F0;'><br>", unsafe_allow_html=True)
 
@@ -1771,9 +1867,9 @@ def render_cvp_module(data, ano):
     qtd_mes_critico = int(totais_por_mes.max())
 
     col1, col2, col3 = st.columns(3)
-    with col1: st.metric("Total de CVP", f"{total_cvp}")
-    with col2: st.metric("Natureza mais Frequente", f"{natureza_critica}", f"{qtd_natureza_critica} casos", delta_color="inverse")
-    with col3: st.metric("Mês mais Crítico", f"{mes_critico}", f"{qtd_mes_critico} casos", delta_color="inverse")
+    with col1: _render_kpi_card("Total de CVP", f"{total_cvp}", icon="bar_chart", accent="#0D3878")
+    with col2: _render_kpi_card("Natureza mais Frequente", f"{natureza_critica}", sublabel=f"🔍 {qtd_natureza_critica} ocorrências", icon="gavel", accent="#7C3AED", delta_negative=True)
+    with col3: _render_kpi_card("Mês mais Crítico", f"{mes_critico}", sublabel=f"📅 {qtd_mes_critico} ocorrências", icon="calendar_month", accent="#F59E0B", delta_negative=True)
     
     st.markdown("<br><hr style='border-color: #E2E8F0;'><br>", unsafe_allow_html=True)
 
@@ -2267,39 +2363,50 @@ def render_home_dashboard(ano_selecionado):
     drogas_mac_atual = get_val(df_final, "Drogas Apreendidas - Maconha (g)", mes_atual)
     drogas_mac_ant = get_val(df_final, "Drogas Apreendidas - Maconha (g)", mes_ant) if mes_num > 1 else get_val(df_ant, "Drogas Apreendidas - Maconha (g)", mes_ant)
     
-    def box_html(title, val, comp_val, mes_comp, color_class):
-        val_str = f"{val:,.0f}".replace(',', '.')
-        comp_str = f"{comp_val:,.0f}".replace(',', '.')
-        
+    def _get_delta_label(title, val, comp_val, mes_comp):
         diff = val - comp_val
-        delta_icon = "↑" if diff > 0 else "↓"
-        delta_class = "negative" if diff > 0 else "positive"
-        
-        if "Armas" in title or "Prisões" in title or "Maconha" in title or "Recuperado" in title:
-            delta_class = "positive" if diff > 0 else "negative"
-        
-        return f"""
-        <div class="kpi-card {color_class}">
-            <div class="kpi-title">{title}</div>
-            <div class="kpi-value val-{color_class.split('-')[1]}">{val_str}</div>
-            <div class="kpi-delta {delta_class}">
-                {delta_icon} {abs(diff):,.0f} vs {mes_comp}
-            </div>
-        </div>
-        """
+        positivo_e_ruim = "Armas" not in title and "Pris\u00f5es" not in title and "Maconha" not in title and "Recuperado" not in title
+        seta = "\u2191" if diff > 0 else "\u2193"
+        return f"{seta} {abs(diff):,.0f} vs {mes_comp}".replace(',', '.')
+
+    def _delta_negativo(title, val, comp_val):
+        diff = val - comp_val
+        positivo_e_ruim = "Armas" not in title and "Pris\u00f5es" not in title and "Maconha" not in title and "Recuperado" not in title
+        return (diff > 0 and positivo_e_ruim) or (diff < 0 and not positivo_e_ruim)
 
     c1, c2, c3 = st.columns(3)
     mes_comp_str = mes_ant if mes_ant else "Ano Anterior"
 
     with c1:
-        st.markdown(box_html("Homicídios (CVLI)", cvli_atual, cvli_ant, mes_comp_str, "card-red"), unsafe_allow_html=True)
-        st.markdown(box_html("CVP Geral", cvp_atual, cvp_ant, mes_comp_str, "card-orange"), unsafe_allow_html=True)
+        _render_kpi_card("Homic\u00eddios (CVLI)", f"{cvli_atual:,.0f}".replace(',', '.'),
+            sublabel=_get_delta_label("CVLI", cvli_atual, cvli_ant, mes_comp_str),
+            icon="sentiment_very_dissatisfied", accent="#DC2626",
+            delta_negative=_delta_negativo("CVLI", cvli_atual, cvli_ant))
+        st.markdown("<div style='margin-top:8px'></div>", unsafe_allow_html=True)
+        _render_kpi_card("CVP Geral", f"{cvp_atual:,.0f}".replace(',', '.'),
+            sublabel=_get_delta_label("CVP", cvp_atual, cvp_ant, mes_comp_str),
+            icon="gavel", accent="#F59E0B",
+            delta_negative=_delta_negativo("CVP", cvp_atual, cvp_ant))
     with c2:
-        st.markdown(box_html("Armas Apreendidas", armas_atual, armas_ant, mes_comp_str, "card-green"), unsafe_allow_html=True)
-        st.markdown(box_html("Total de MVI", mvi_atual, mvi_ant, mes_comp_str, "card-red"), unsafe_allow_html=True)
+        _render_kpi_card("Armas Apreendidas", f"{armas_atual:,.0f}".replace(',', '.'),
+            sublabel=_get_delta_label("Armas", armas_atual, armas_ant, mes_comp_str),
+            icon="security", accent="#16A34A",
+            delta_negative=_delta_negativo("Armas", armas_atual, armas_ant))
+        st.markdown("<div style='margin-top:8px'></div>", unsafe_allow_html=True)
+        _render_kpi_card("Total de MVI", f"{mvi_atual:,.0f}".replace(',', '.'),
+            sublabel=_get_delta_label("MVI", mvi_atual, mvi_ant, mes_comp_str),
+            icon="bar_chart", accent="#0D3878",
+            delta_negative=_delta_negativo("MVI", mvi_atual, mvi_ant))
     with c3:
-        st.markdown(box_html("Prisões Realizadas", prisoes_atual, prisoes_ant, mes_comp_str, "card-blue"), unsafe_allow_html=True)
-        st.markdown(box_html("Maconha Ap. (g)", drogas_mac_atual, drogas_mac_ant, mes_comp_str, "card-purple"), unsafe_allow_html=True)
+        _render_kpi_card("Pris\u00f5es Realizadas", f"{prisoes_atual:,.0f}".replace(',', '.'),
+            sublabel=_get_delta_label("Pris\u00f5es", prisoes_atual, prisoes_ant, mes_comp_str),
+            icon="person_off", accent="#7C3AED",
+            delta_negative=_delta_negativo("Pris\u00f5es", prisoes_atual, prisoes_ant))
+        st.markdown("<div style='margin-top:8px'></div>", unsafe_allow_html=True)
+        _render_kpi_card("Maconha Ap. (g)", f"{drogas_mac_atual:,.0f}".replace(',', '.'),
+            sublabel=_get_delta_label("Maconha", drogas_mac_atual, drogas_mac_ant, mes_comp_str),
+            icon="grass", accent="#16A34A",
+            delta_negative=_delta_negativo("Maconha", drogas_mac_atual, drogas_mac_ant))
 
 
 
