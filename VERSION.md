@@ -18,9 +18,15 @@ O formato é baseado em [Versionamento Semântico (SemVer)](https://semver.org/l
   - Altura fixa (`130px`) garantindo alinhamento uniforme entre cards com e sem sublabel.
 
 ### [Alterado]
+- **Inversão de Fluxo visual (Tabela Primeiro):** Reordenação do layout nas abas **Analítico**, **Consolidado** e **Comparativo**. Agora as tabelas, gráficos e KPIs são exibidos no topo da página, com os filtros e configurações de período movidos para a parte inferior (em expanders recolhidos por padrão), otimizando o foco nos resultados.
 - **Aba Início:** Substituição da função `box_html()` e suas classes CSS customizadas pelos novos `_render_kpi_card()`, com sublabels de delta comparativo (↑/↓ vs mês anterior) e lógica de cor contextual (vermelho para crimes, verde para operacional).
+- **Estilo de Tabelas (Geral):** Refatoração da função `_apply_table_style()` com foco em escaneabilidade e estética premium:
+  - **Tratamento de ruído:** Valores nulos ou zeros substituídos pelo traço "—".
+  - **Alinhamento:** Textos à esquerda e dados numéricos à direita (padrão ouro financeiro).
+  - **Legibilidade:** Implementação de *Zebra Stripes* (linhas alternadas) e negrito na coluna TOTAL.
+  - **Acabamento:** Arredondamento dos cantos (`border-radius`) da linha de TOTAL GERAL (azul PMAL) para consistência com o estilo dos cards.
 - **Ícones de subtítulos:** Migração global do `@import` da fonte `Material Symbols Rounded` da função `render_home_dashboard` para o bloco CSS raiz (`<style>` global), garantindo disponibilidade em todas as abas sem recarregamento.
-- **Uniformização visual:** Todas as abas (MVI, Analítico MVI, CVP/Patrimônio, Drogas e Início) utilizam agora o mesmo padrão de card de KPI.
+- **Uniformização visual:** Todas as abas (MVI, Analítico MVI, CVP/Patrimônio, Drogas e Início) utilizam agora o mesmo padrão de card de KPI e estilização de tabelas.
 
 ---
 

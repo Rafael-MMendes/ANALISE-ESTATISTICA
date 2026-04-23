@@ -1441,33 +1441,93 @@ def load_data_cvp(keyword, ano):
 ESCALA_GRADIENTE = ['#DCFCE7', '#BBF7D0', '#86EFAC', '#FDE68A', '#FCA5A5', '#F87171']
 
 def _apply_table_style(df, highlight_row=None):
-    """Aplica estilo institucional (PDF-like) ao dataframe: cabeçalho azul PMAL, zebra striping, TOTAL GERAL destacado."""
+    """Aplica estilo institucional premium ao dataframe:
+    - Zeros substituídos por traço (—)
+    - Alinhamento: texto à esquerda, números à direita
+    - Zebra stripes em linhas alternadas
+    - Negrito na coluna TOTAL
+    - Linha TOTAL GERAL com fundo azul PMAL e border-radius suave
+    """
     import pandas as pd
 
+    # Identifica colunas numéricas (todos exceto a primeira coluna de texto)
+    first_col = df.columns[0]
+    num_cols = [c for c in df.columns if c != first_col]
+    total_col = 'TOTAL' if 'TOTAL' in df.columns else (num_cols[-1] if num_cols else None)
+
     def style_cell(val):
+        """Estiliza células individuais por tipo e valor."""
         try:
             if pd.isna(val):
-                return "color: #94A3B8;"
+                return "color: #CBD5E1; text-align: right;"
         except (ValueError, TypeError):
             pass
         if isinstance(val, (int, float)):
-            if val > 0:
-                return "background-color: #F8FAFC; color: #1E293B; font-weight: 500;"
+            if val == 0:
+                # Zero → cor muito suave (o texto "—" será aplicado via format)
+                return "color: #CBD5E1; text-align: right;"
             else:
-                return "color: #94A3B8;"
-        return "font-weight: 600; color: #1E293B;"
+                return "color: #1E293B; font-weight: 500; text-align: right;"
+        # Coluna de texto (primeira coluna)
+        return "font-weight: 600; color: #1E293B; text-align: left;"
 
-    styler = df.style.map(style_cell)
+    def zebra_rows(s):
+        """Aplica zebra stripes baseado na posição da linha."""
+        styles = []
+        for i in range(len(s)):
+            if i % 2 == 0:
+                styles.append("background-color: #F8FAFC;")
+            else:
+                styles.append("background-color: #FFFFFF;")
+        return styles
+
+    def highlight_total_col(s):
+        """Destaca coluna TOTAL com negrito."""
+        if s.name == total_col:
+            return ["font-weight: 700; color: #0D3878; text-align: right;"] * len(s)
+        return [""] * len(s)
+
+    def highlight_total_row(s):
+        """Destaca a linha TOTAL GERAL com fundo azul PMAL."""
+        if s.name == highlight_row:
+            styles = []
+            for i, c in enumerate(s.index):
+                base_style = "background-color: #0D3878; color: #FFFFFF; font-weight: 700; border-top: 2px solid #0A2D6B;"
+                if c == first_col:
+                    styles.append(f"{base_style} text-align: left; border-radius: 8px 0 0 8px;")
+                elif i == len(s) - 1:
+                    styles.append(f"{base_style} text-align: right; border-radius: 0 8px 8px 0;")
+                else:
+                    styles.append(f"{base_style} text-align: right;")
+            return styles
+        return [""] * len(s)
+
+    # Formata zeros como "—" e mantém demais valores inteiros
+    def fmt(val):
+        if isinstance(val, float):
+            if val == 0.0:
+                return "—"
+            return f"{val:,.1f}".replace(",", ".")
+        if isinstance(val, int):
+            if val == 0:
+                return "—"
+            return f"{val:,}".replace(",", ".")
+        return str(val) if val is not None else "—"
+
+    styler = (
+        df.style
+        .map(style_cell)
+        .apply(zebra_rows, axis=1)
+        .apply(highlight_total_col, axis=0)
+        .format(fmt, subset=num_cols)
+    )
 
     if highlight_row is not None:
         try:
-            styler = styler.apply(
-                lambda s: ['background-color: #0D3878; color: #FFFFFF; font-weight: 700;'] * len(s)
-                if s.name == highlight_row else [''] * len(s),
-                axis=1
-            )
+            styler = styler.apply(highlight_total_row, axis=1)
         except Exception:
             pass
+
     return styler
 
 
@@ -1670,85 +1730,88 @@ def render_analitico_mvi(data, title, ano):
         st.warning("Nenhum dado encontrado para análise analítica.")
         return
 
-    # Filtros de Refino na própria página
-    with st.expander("🔍 Filtros de Pesquisa Avançada", expanded=True):
-        c1, c2, c3 = st.columns([2, 2, 1])
-        with c1:
-            meses_disp = sorted(data['Mês'].unique().tolist(), key=lambda x: MESES_LIST.index(x))
-            meses_sel = st.multiselect("Filtrar por Meses", options=meses_disp, default=meses_disp)
-        with c2:
-            bairros_disp = sorted(data['Bairro'].dropna().unique().tolist())
-            bairros_sel = st.multiselect("Filtrar por Bairros", options=bairros_disp, default=bairros_disp)
-        with c3:
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("Resetar Filtros", use_container_width=True):
-                st.rerun()
+    # --- Layout Reordenado (Dados Primeiro, Filtros Depois) ---
+    container_dados = st.container()
+    st.markdown("<br>", unsafe_allow_html=True)
+    container_filtros = st.container()
+
+    with container_filtros:
+        # Filtros de Refino na própria página
+        with st.expander("🔍 Filtros de Pesquisa Avançada", expanded=False):
+            c1, c2, c3 = st.columns([2, 2, 1])
+            with c1:
+                meses_disp = sorted(data['Mês'].unique().tolist(), key=lambda x: MESES_LIST.index(x))
+                meses_sel = st.multiselect("Filtrar por Meses", options=meses_disp, default=meses_disp)
+            with c2:
+                bairros_disp = sorted(data['Bairro'].dropna().unique().tolist())
+                bairros_sel = st.multiselect("Filtrar por Bairros", options=bairros_disp, default=bairros_disp)
+            with c3:
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("Resetar Filtros", use_container_width=True):
+                    st.rerun()
 
     # Aplicação dos Filtros
     df_filtrado = data[data['Mês'].isin(meses_sel) & data['Bairro'].isin(bairros_sel)].copy()
 
-    # KPI Rápido
-    st.markdown("---")
-    res_c1, res_c2, res_c3, res_c4 = st.columns(4)
-    with res_c1: _render_kpi_card("Ocorrências Filtradas", str(len(df_filtrado)), icon="bar_chart", accent="#0D3878")
-    with res_c2: _render_kpi_card("Bairros Distintos", str(df_filtrado['Bairro'].nunique()), icon="map", accent="#1E5AAF")
-    
-    # Idade média
-    try:
-        idade_media = pd.to_numeric(df_filtrado['Idade'], errors='coerce').mean()
-        with res_c3: _render_kpi_card("Idade Média", f"{idade_media:.1f}" if pd.notna(idade_media) else "N/A", icon="person", accent="#7C3AED")
-    except:
-        with res_c3: _render_kpi_card("Idade Média", "N/A", icon="person", accent="#7C3AED")
+    with container_dados:
+        # KPI Rápido
+        st.markdown("---")
+        res_c1, res_c2, res_c3, res_c4 = st.columns(4)
+        with res_c1: _render_kpi_card("Ocorrências Filtradas", str(len(df_filtrado)), icon="bar_chart", accent="#0D3878")
+        with res_c2: _render_kpi_card("Bairros Distintos", str(df_filtrado['Bairro'].nunique()), icon="map", accent="#1E5AAF")
         
-    # Perfil Principal (Tipo de Morte ou Instrumento para Tentativa)
-    natureza_col = 'Tipo de Morte' if 'Tipo de Morte' in df_filtrado.columns else ('Instrumento' if 'Instrumento' in df_filtrado.columns else 'Natureza')
-    with res_c4: _render_kpi_card("Natureza Principal", df_filtrado[natureza_col].mode()[0] if not df_filtrado.empty and natureza_col in df_filtrado.columns else "N/A", icon="gavel", accent="#DC2626")
+        # Idade média
+        try:
+            idade_media = pd.to_numeric(df_filtrado['Idade'], errors='coerce').mean()
+            with res_c3: _render_kpi_card("Idade Média", f"{idade_media:.1f}" if pd.notna(idade_media) else "N/A", icon="person", accent="#7C3AED")
+        except:
+            with res_c3: _render_kpi_card("Idade Média", "N/A", icon="person", accent="#7C3AED")
+            
+        # Perfil Principal
+        natureza_col = 'Tipo de Morte' if 'Tipo de Morte' in df_filtrado.columns else ('Instrumento' if 'Instrumento' in df_filtrado.columns else 'Natureza')
+        with res_c4: _render_kpi_card("Natureza Principal", df_filtrado[natureza_col].mode()[0] if not df_filtrado.empty and natureza_col in df_filtrado.columns else "N/A", icon="gavel", accent="#DC2626")
 
-    # Gráficos Analíticos
-    st.markdown("<br>", unsafe_allow_html=True)
-    g1, g2 = st.columns([3, 2])
-    
-    with g1:
-        st.markdown("### 📍 Ocorrências por Localidade (Bairro)")
-        counts_bairro = df_filtrado['Bairro'].value_counts().reset_index()
-        counts_bairro.columns = ['Bairro', 'Total']
-        fig_bairro = px.bar(counts_bairro, x='Total', y='Bairro', orientation='h', 
-                           color='Total', color_continuous_scale=ESCALA_GRADIENTE, text='Total')
-        fig_bairro.update_layout(height=400, margin=dict(l=0, r=0, t=10, b=0), plot_bgcolor='white', coloraxis_showscale=False)
-        st.plotly_chart(fig_bairro, use_container_width=True)
+        # Gráficos Analíticos
+        st.markdown("<br>", unsafe_allow_html=True)
+        g1, g2 = st.columns([3, 2])
+        
+        with g1:
+            st.markdown("### 📍 Ocorrências por Localidade (Bairro)")
+            counts_bairro = df_filtrado['Bairro'].value_counts().reset_index()
+            counts_bairro.columns = ['Bairro', 'Total']
+            fig_bairro = px.bar(counts_bairro.head(15), x='Total', y='Bairro', orientation='h', 
+                               color='Total', color_continuous_scale=ESCALA_GRADIENTE, text='Total')
+            fig_bairro.update_layout(height=400, margin=dict(l=0, r=0, t=10, b=0), plot_bgcolor='white', coloraxis_showscale=False)
+            st.plotly_chart(fig_bairro, use_container_width=True)
 
-    with g2:
-        st.markdown(f"### 🏷️ Perfil: {natureza_col}")
-        counts_tipo = df_filtrado[natureza_col].value_counts().reset_index()
-        counts_tipo.columns = ['Tipo', 'Total']
-        fig_tipo = px.pie(counts_tipo, values='Total', names='Tipo', hole=0.4,
-                         color_discrete_sequence=px.colors.qualitative.Pastel)
-        fig_tipo.update_layout(height=400, margin=dict(l=0, r=0, t=10, b=0))
-        st.plotly_chart(fig_tipo, use_container_width=True)
+        with g2:
+            st.markdown(f"### 🏷️ Perfil: {natureza_col}")
+            counts_tipo = df_filtrado[natureza_col].value_counts().reset_index()
+            counts_tipo.columns = ['Tipo', 'Total']
+            fig_tipo = px.pie(counts_tipo, values='Total', names='Tipo', hole=0.4,
+                             color_discrete_sequence=px.colors.qualitative.Pastel)
+            fig_tipo.update_layout(height=400, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=-0.1))
+            st.plotly_chart(fig_tipo, use_container_width=True)
 
-    # Tabela Analítica de Dados
-    st.markdown("### 📋 Listagem Nominal de Ocorrências")
-    
-    # Seleção das colunas para exibição na tabela analítica
-    cols_analiticas = [
-        'Data do Fato', 'Nº BOU', 'Nome', 'Idade', 'Bairro', 
-        'Cidade', 'Subjetividade Complementar', natureza_col
-    ]
-    
-    # Filtra colunas que realmente existem no DF
-    cols_show = [c for c in cols_analiticas if c in df_filtrado.columns]
-    
-    df_tabela = df_filtrado[cols_show].copy()
-    df_tabela = df_tabela.rename(columns={
-        'Nome': 'Nome da Vítima',
-        'Bairro': 'Local (Bairro)',
-        natureza_col: 'Natureza'
-    })
+        # Tabela Analítica
+        st.markdown("### 📋 Listagem Nominal de Ocorrências")
+        cols_analiticas = ['Data do Fato', 'Nº BOU', 'Nome', 'Idade', 'Bairro', 'Cidade', 'Subjetividade Complementar', natureza_col]
+        cols_show = [c for c in cols_analiticas if c in df_filtrado.columns]
+        
+        df_tabela = df_filtrado[cols_show].copy()
+        df_tabela = df_tabela.rename(columns={'Nome': 'Nome da Vítima', 'Bairro': 'Local (Bairro)', natureza_col: 'Natureza'})
 
-    st.dataframe(
-        df_tabela.style.map(lambda x: "font-weight: bold; color: #0D3878;" if isinstance(x, str) and "/" in x else ""),
-        use_container_width=True, hide_index=True
-    )
+        def style_analitico(val):
+            if isinstance(val, (int, float)): return "text-align: right;"
+            return "text-align: left;"
+        def fmt_analitico(val):
+            if val == 0 or val == 0.0: return "—"
+            if isinstance(val, (int, float)): return f"{val:,}".replace(",", ".")
+            return str(val) if val is not None else "—"
+
+        st_df = df_tabela.style.map(lambda x: "font-weight: bold; color: #0D3878;" if isinstance(x, str) and "/" in x else "")
+        st_df = st_df.map(style_analitico).format(fmt_analitico)
+        st.dataframe(st_df, use_container_width=True, hide_index=True)
 
     # --- Área de Exportação Estabilizada ---
     with st.expander(f"📥 Preparar Relatório Analítico ({title})", expanded=False):
@@ -1820,8 +1883,7 @@ def render_drogas_module(data):
 
         cor_hex = cores[droga]
         st.dataframe(
-            _apply_table_style(pivot, highlight_row='TOTAL GERAL')
-             .format("{:,.0f}"),
+            _apply_table_style(pivot, highlight_row='TOTAL GERAL'),
             use_container_width=True
         )
         
@@ -2061,25 +2123,33 @@ def render_consolidado_module(ano_selecionado):
 
     st.markdown("---")
 
+    # --- Layout Reordenado (Tabela Primeiro, Filtros Depois) ---
+    container_tabela = st.container()
+    st.markdown("<br>", unsafe_allow_html=True)
+    container_filtros = st.container()
+
     # Filtros e Lógica baseada no Cartão Ativo
     if st.session_state.cons_view == "Anual":
         cidade_sel = "Todas"
         meses_sel = MESES_LIST
-        st.markdown(f"<p style='color: #64748B; text-align: center; margin-top: -15px;'>Exibindo Relatório Consolidado Anual para {ano_selecionado}</p>", unsafe_allow_html=True)
+        with container_tabela:
+            st.markdown(f"<p style='color: #64748B; text-align: center; margin-top: -15px;'>Exibindo Relatório Consolidado Anual para {ano_selecionado}</p>", unsafe_allow_html=True)
     else:
-        # Filtros de Refino (Expostos apenas no modo Mensal/Cidade)
-        with st.expander("🔍 Filtros de Refino Territorial e Temporal", expanded=True):
-            f1, f2 = st.columns([1.5, 2.5])
-            with f1:
-                cidade_lista = ["Todas"] + sorted(['Água Branca', 'Canapi', 'Delmiro Gouveia', 'Inhapi', 'Mata Grande', 'Olho d Água do Casado', 'Pariconha', 'Piranhas'])
-                cidade_sel = st.selectbox("Cidade", cidade_lista, key="cons_cidade")
-            with f2:
-                meses_sel = st.multiselect("Filtrar Meses (impacta na coluna TOTAL)", options=MESES_LIST, default=MESES_LIST, key="cons_meses")
+        with container_filtros:
+            # Filtros de Refino (Expostos apenas no modo Mensal/Cidade)
+            with st.expander("🔍 Filtros de Refino Territorial e Temporal", expanded=False):
+                f1, f2 = st.columns([1.5, 2.5])
+                with f1:
+                    cidade_lista = ["Todas"] + sorted(['Água Branca', 'Canapi', 'Delmiro Gouveia', 'Inhapi', 'Mata Grande', 'Olho d Água do Casado', 'Pariconha', 'Piranhas'])
+                    cidade_sel = st.selectbox("Cidade", cidade_lista, key="cons_cidade")
+                with f2:
+                    meses_sel = st.multiselect("Filtrar Meses (impacta na coluna TOTAL)", options=MESES_LIST, default=MESES_LIST, key="cons_meses")
 
     df_raw, meses_ordem = get_consolidado_data(ano_selecionado, cidade_sel)
 
     if cidade_sel != "Todas":
-        st.info(f"⚠️ Indicador CVP exibido como **BPM GLOBAL** (filtro por cidade indisponível).")
+        with container_tabela:
+            st.info(f"⚠️ Indicador CVP exibido como **BPM GLOBAL** (filtro por cidade indisponível).")
 
     # Processamento Final
     df_final = df_raw[['Indicador']].copy()
@@ -2090,11 +2160,15 @@ def render_consolidado_module(ano_selecionado):
     df_final['TOTAL'] = df_final[meses_sel].sum(axis=1)
 
     def format_val(x):
-        try: return f"{int(round(x))}"
-        except: return str(x)
+        try:
+            v = int(round(x))
+            return "—" if v == 0 else f"{v:,}".replace(",", ".")
+        except:
+            return str(x)
 
     styled_df = _apply_table_style(df_final).format(format_val, subset=meses_sel + ['TOTAL'])
-    st.dataframe(styled_df, use_container_width=True, hide_index=True)
+    with container_tabela:
+        st.dataframe(styled_df, use_container_width=True, hide_index=True)
     
     # Exportação Final com Filtros
     excel_data = convert_df_to_excel(df_final)
@@ -2145,22 +2219,28 @@ def render_comparativo_module():
 
     st.markdown("---")
 
-    # Filtros e Lógica baseada no Cartão Ativo
-    with st.expander("🔍 Configuração do Período de Comparação", expanded=True):
-        f1, f2, f3 = st.columns([1, 1, 2])
-        with f1:
-            ano1 = st.selectbox("Ano Base", [2024, 2025, 2026], index=1)
-        with f2:
-            ano2 = st.selectbox("Ano Comp.", [2024, 2025, 2026], index=2)
-        with f3:
-            cidade_lista = ["Todas"] + sorted(['Água Branca', 'Canapi', 'Delmiro Gouveia', 'Inhapi', 'Mata Grande', 'Olho d Água do Casado', 'Pariconha', 'Piranhas'])
-            cidade_sel = st.selectbox("Cidade", cidade_lista, key="comp_cidade")
-        
-        if st.session_state.comp_view == "Mensal":
-            meses_sel = st.multiselect("Filtrar Meses Específicos", options=MESES_LIST, default=MESES_LIST, key="comp_meses")
-        else:
-            meses_sel = MESES_LIST
-            st.info("📌 Comparando o Ciclo Anual Completo (Jan-Dez)")
+    # --- Layout Reordenado (Tabela Primeiro, Filtros Depois) ---
+    container_tabela = st.container()
+    st.markdown("<br>", unsafe_allow_html=True)
+    container_filtros = st.container()
+
+    with container_filtros:
+        # Filtros e Lógica baseada no Cartão Ativo
+        with st.expander("🔍 Configuração do Período de Comparação", expanded=False):
+            f1, f2, f3 = st.columns([1, 1, 2])
+            with f1:
+                ano1 = st.selectbox("Ano Base", [2024, 2025, 2026], index=1)
+            with f2:
+                ano2 = st.selectbox("Ano Comp.", [2024, 2025, 2026], index=2)
+            with f3:
+                cidade_lista = ["Todas"] + sorted(['Água Branca', 'Canapi', 'Delmiro Gouveia', 'Inhapi', 'Mata Grande', 'Olho d Água do Casado', 'Pariconha', 'Piranhas'])
+                cidade_sel = st.selectbox("Cidade", cidade_lista, key="comp_cidade")
+            
+            if st.session_state.comp_view == "Mensal":
+                meses_sel = st.multiselect("Filtrar Meses Específicos", options=MESES_LIST, default=MESES_LIST, key="comp_meses")
+            else:
+                meses_sel = MESES_LIST
+                st.info("📌 Comparando o Ciclo Anual Completo (Jan-Dez)")
 
     if ano1 == ano2:
         st.warning("Selecione anos diferentes para o comparativo.")
@@ -2199,55 +2279,25 @@ def render_comparativo_module():
     ind_crim = ['MVI', 'CVLI', 'Tentativa de MVI', 'CVP Geral', 'Maria da Penha']
     # Produtividade (Aumento = Bom/Verde)
     ind_prod = ['Cumprimento de Mandados', 'Visita Comunitária', 'Veículos Recuperados', 'Armas Apreendidas', 'Prisões']
-    # Todos demais contém TCO e Drogas: Assumiremos Drogas/TCO como Aumento = Verde
     
-    def stylize_yoy(val, indicador):
-        if not isinstance(val, (int, float)) or pd.isna(val):
-            return "font-weight: bold; color: white"
-            
-        is_crime = False
-        for c_ind in ind_crim:
-            if c_ind in str(indicador):
-                is_crime = True
-                break
-                
-        if val > 0:
-            if is_crime: return "background-color: #FEE2E2; color: #DC2626; font-weight: bold;" # Ruim
-            else: return "background-color: #DCFCE7; color: #16A34A; font-weight: bold;" # Bom
-        elif val < 0:
-            if is_crime: return "background-color: #DCFCE7; color: #16A34A; font-weight: bold;" # Bom
-            else: return "background-color: #FEE2E2; color: #DC2626; font-weight: bold;" # Ruim
-        else:
-            return "color: #64748B;" # Zero mudanca
-            
     def format_yoy(val):
-        if not isinstance(val, (int, float)) or pd.isna(val):
-            return str(val)
-        if val == 0:
-            return "0%"
-        elif val > 0:
-            return f"↑ +{val:.0f}%"
-        else:
-            return f"↓ {val:.0f}%"
+        if not isinstance(val, (int, float)) or pd.isna(val): return str(val)
+        if val == 0: return "—"
+        elif val > 0: return f"↑ +{val:.0f}%"
+        else: return f"↓ {val:.0f}%"
             
-    # Devido à complexidade semântica (Estilo baseado na célula + indicador), aplicamos row-level mapping
-    styled_df = df_comp.copy()
-    
     # Format texto
     cols_format = meses_sel + ['TOTAL']
+    df_comp_disp = df_comp.copy()
     for c in cols_format:
-        df_comp[c] = df_comp[c].apply(format_yoy)
+        df_comp_disp[c] = df_comp[c].apply(format_yoy)
         
-    s = df_comp.style
-    
     def apply_color(row):
         indicador = row['Indicador']
         styles = ['font-weight: 700; color: #1E293B;']
-        
         for c in cols_format:
             val_str = row[c]
-            if val_str == "0%":
-                styles.append("color: #64748B;")
+            if val_str == "—": styles.append("color: #CBD5E1; text-align: right;")
             elif "↑" in val_str:
                 is_crime = any(ci in indicador for ci in ind_crim)
                 if is_crime: styles.append("background-color: #FEE2E2; color: #DC2626; font-weight: bold;")
@@ -2256,13 +2306,13 @@ def render_comparativo_module():
                 is_crime = any(ci in indicador for ci in ind_crim)
                 if is_crime: styles.append("background-color: #DCFCE7; color: #16A34A; font-weight: bold;")
                 else: styles.append("background-color: #FEE2E2; color: #DC2626; font-weight: bold;")
-            else:
-                styles.append("")
+            else: styles.append("")
         return styles
 
-    s = s.apply(apply_color, axis=1)
+    s = df_comp_disp.style.apply(apply_color, axis=1)
     
-    st.dataframe(s, use_container_width=True, hide_index=True)
+    with container_tabela:
+        st.dataframe(s, use_container_width=True, hide_index=True)
     
     # Export Buttons
     df_export = df_comp.copy()
