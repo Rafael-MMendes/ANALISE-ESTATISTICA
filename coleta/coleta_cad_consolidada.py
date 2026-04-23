@@ -59,9 +59,93 @@ async def handle_download(context, page, f_grid, filename, destino_dir):
             return False
 
 async def script_coleta_consolidada():
-    USER = os.getenv('CAD_USER')
-    PASS = os.getenv('CAD_PASS')
-    WORKSPACE = os.path.dirname(os.path.abspath(__file__))
+    import tkinter as tk
+    from tkinter import messagebox
+
+    def create_styled_window(title, width, height):
+        root = tk.Tk()
+        root.title(title)
+        
+        # Centralizar a janela
+        screen_w = root.winfo_screenwidth()
+        screen_h = root.winfo_screenheight()
+        x = int((screen_w/2) - (width/2))
+        y = int((screen_h/2) - (height/2))
+        root.geometry(f"{width}x{height}+{x}+{y}")
+        
+        root.configure(bg="#1E1E1E")
+        root.attributes('-topmost', True)
+        root.resizable(False, False)
+        return root
+
+    def pedir_credenciais():
+        root = create_styled_window("Login CAD", 350, 280)
+        result = {"user": None, "pass": None}
+        
+        tk.Label(root, text="Autenticação do CAD", fg="#FFFFFF", bg="#1E1E1E", font=("Segoe UI", 16, "bold")).pack(pady=(20, 15))
+        frame = tk.Frame(root, bg="#1E1E1E")
+        frame.pack(fill="x", padx=30)
+        
+        tk.Label(frame, text="CPF:", fg="#CCCCCC", bg="#1E1E1E", font=("Segoe UI", 10)).pack(anchor="w")
+        entry_user = tk.Entry(frame, font=("Segoe UI", 12), bg="#333333", fg="#FFFFFF", insertbackground="white", relief="flat")
+        entry_user.pack(fill="x", pady=(2, 10), ipady=4)
+        
+        tk.Label(frame, text="Senha:", fg="#CCCCCC", bg="#1E1E1E", font=("Segoe UI", 10)).pack(anchor="w")
+        entry_pass = tk.Entry(frame, font=("Segoe UI", 12), bg="#333333", fg="#FFFFFF", insertbackground="white", relief="flat", show="*")
+        entry_pass.pack(fill="x", pady=(2, 15), ipady=4)
+        
+        def on_submit(event=None):
+            result["user"] = entry_user.get().strip()
+            result["pass"] = entry_pass.get().strip()
+            if not result["user"] or not result["pass"]:
+                messagebox.showwarning("Aviso", "Preencha todos os campos!", parent=root)
+                return
+            root.destroy()
+            
+        btn = tk.Button(root, text="Entrar", bg="#0066CC", fg="white", activebackground="#0052A3", activeforeground="white", font=("Segoe UI", 11, "bold"), relief="flat", command=on_submit, cursor="hand2")
+        btn.pack(fill="x", padx=30, ipady=5)
+        
+        entry_user.bind('<Return>', lambda e: entry_pass.focus())
+        entry_pass.bind('<Return>', on_submit)
+        entry_user.focus()
+        
+        root.mainloop()
+        return result["user"], result["pass"]
+
+    def pedir_token():
+        root = create_styled_window("Token CAD", 350, 220)
+        result = {"token": None}
+        
+        tk.Label(root, text="Token Requerido", fg="#FFFFFF", bg="#1E1E1E", font=("Segoe UI", 16, "bold")).pack(pady=(20, 15))
+        frame = tk.Frame(root, bg="#1E1E1E")
+        frame.pack(fill="x", padx=30)
+        
+        tk.Label(frame, text="Digite o TOKEN enviado (E-mail/SMS):", fg="#CCCCCC", bg="#1E1E1E", font=("Segoe UI", 10)).pack(anchor="w")
+        entry_token = tk.Entry(frame, font=("Segoe UI", 12), bg="#333333", fg="#FFFFFF", insertbackground="white", relief="flat")
+        entry_token.pack(fill="x", pady=(2, 15), ipady=4)
+        
+        def on_submit(event=None):
+            result["token"] = entry_token.get().strip()
+            if not result["token"]:
+                messagebox.showwarning("Aviso", "O Token é obrigatório!", parent=root)
+                return
+            root.destroy()
+            
+        btn = tk.Button(root, text="Confirmar", bg="#28A745", fg="white", activebackground="#218838", activeforeground="white", font=("Segoe UI", 11, "bold"), relief="flat", command=on_submit, cursor="hand2")
+        btn.pack(fill="x", padx=30, ipady=5)
+        
+        entry_token.bind('<Return>', on_submit)
+        entry_token.focus()
+        
+        root.mainloop()
+        return result["token"]
+
+    USER, PASS = pedir_credenciais()
+    if not USER or not PASS:
+        log("Usuário ou senha não fornecidos. Encerrando automação.")
+        return
+
+    WORKSPACE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     DESTINO_DIR = os.path.join(WORKSPACE, "dados", "2026")
     os.makedirs(DESTINO_DIR, exist_ok=True)
     
@@ -97,34 +181,21 @@ async def script_coleta_consolidada():
             log("Verificando se pede Token...")
             await page.wait_for_selector('#token', timeout=15000)
             print("\n" + "="*50)
-            print("🔑 TOKEN REQUERIDO PELO CAD! (Aguardando input no Dashboard)")
+            print("🔑 TOKEN REQUERIDO PELO CAD! (Exibindo janela de popup)")
             print("="*50)
             
-            # Avisa o dashboard que precisa do token
-            with open("coleta_status.txt", "w", encoding="utf-8") as f:
-                f.write("WAITING_TOKEN")
-            
-            token = ""
-            log("Aguardando Streamlit repassar o token pelo arquivo token_response.txt...")
-            while True:
-                if os.path.exists("token_response.txt"):
-                    with open("token_response.txt", "r", encoding="utf-8") as f:
-                        token = f.read().strip()
-                    os.remove("token_response.txt")
-                    break
-                await asyncio.sleep(2)
+            token = pedir_token()
+            if not token:
+                log("Token não fornecido. Encerrando.")
+                await browser.close()
+                return
                 
             print("Token recebido com sucesso!")
-            with open("coleta_status.txt", "w", encoding="utf-8") as f:
-                f.write("RUNNING")
 
             await page.fill('#token', token)
             await page.click('input[type="submit"]')
             await asyncio.sleep(3)
         except Exception as e:
-            # Caso não peça token, garante que o status continue
-            with open("coleta_status.txt", "w", encoding="utf-8") as f:
-                f.write("RUNNING")
             pass
 
         log("Aguardando carregamento do portal principal (Portal de Pesquisa)...")

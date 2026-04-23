@@ -6,6 +6,19 @@ O formato é baseado em [Versionamento Semântico (SemVer)](https://semver.org/l
 
 ---
 
+## [2.0.1] - 2026-04-22
+
+### [Alterado]
+- Organização completa do projeto em subpastas seguindo boas práticas de arquitetura:
+  - `assets/`: imagens e logos do dashboard.
+  - `logs/`: arquivos de log de automação, relatórios HTML e imagens de depuração.
+  - `testes/`: scripts de depuração, mapeamento, exploração e testes manuais da interface do Pentaho/CAD.
+  - `coleta/`: scripts unificados de extração automática dos dados.
+- Interface popup de credenciais do CAD atualizada de janelas cinzas padrão (simpledialog) para design moderno Dark Mode (janela customizada flat, centralizada, sem título com botões hover).
+- Caminhos do arquivo `app.py`, `Iniciar_Coleta.bat` e scripts filhos atualizados para refletir a nova disposição dos diretórios.
+
+---
+
 ## [2.0.0] - 2026-04-15
 
 ### [Adicionado]

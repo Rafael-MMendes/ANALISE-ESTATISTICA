@@ -44,10 +44,10 @@ class PDFRelatorio(FPDF):
         self.rect(0, 27.5, 297, 1.5, 'F')
 
         # Posicionamento dos Brasões Oficiais
-        if os.path.exists("brasao_municipio.png"):
-            self.image("brasao_municipio.png", x=12, y=3, w=18)
-        if os.path.exists("brasao_9bpm.png"):
-            self.image("brasao_9bpm.png", x=267, y=3, w=18)
+        if os.path.exists("assets/brasao_municipio.png"):
+            self.image("assets/brasao_municipio.png", x=12, y=3, w=18)
+        if os.path.exists("assets/brasao_9bpm.png"):
+            self.image("assets/brasao_9bpm.png", x=267, y=3, w=18)
 
         # Inserção do Texto Institucional no Topo
         self.set_y(5)
@@ -77,9 +77,9 @@ class PDFRelatorio(FPDF):
         
         # Aplicação Sutil da Marca D'água no Corpo da Página
         try:
-            if os.path.exists("brasao_9bpm.png"):
+            if os.path.exists("assets/brasao_9bpm.png"):
                 with self.local_context(fill_opacity=0.08):
-                    self.image("brasao_9bpm.png", x=108, y=55, w=80)
+                    self.image("assets/brasao_9bpm.png", x=108, y=55, w=80)
         except Exception:
             pass
 
@@ -744,8 +744,8 @@ def _img_to_base64(path):
     return ""
 
 def render_header():
-    logo_9bpm_b64 = _img_to_base64("brasao_9bpm.png")
-    logo_municipio_b64 = _img_to_base64("brasao_municipio.png")
+    logo_9bpm_b64 = _img_to_base64("assets/brasao_9bpm.png")
+    logo_municipio_b64 = _img_to_base64("assets/brasao_municipio.png")
 
     logo_9bpm_img = f'<img src="data:image/png;base64,{logo_9bpm_b64}" alt="9º BPM">' if logo_9bpm_b64 else ""
     logo_municipio_img = f'<img src="data:image/png;base64,{logo_municipio_b64}" alt="Município">' if logo_municipio_b64 else ""
@@ -1503,7 +1503,6 @@ def render_mvi_module(data, title, ano):
     st.dataframe(
         _apply_table_style(pivot, highlight_row='TOTAL GERAL'),
         use_container_width=True
-    )
 
     st.markdown("<br><hr style='border-color: #E2E8F0;'><br>", unsafe_allow_html=True)
 
@@ -1526,6 +1525,7 @@ def render_mvi_module(data, title, ano):
         fig2.update_traces(marker_color='#0D3878', textposition='outside', textfont_size=12)
         fig2.update_layout(plot_bgcolor='rgba(255,255,255,1)', paper_bgcolor='rgba(255,255,255,1)', font_color='#1E293B', margin=dict(l=0, r=0, t=30, b=0), xaxis_title="", yaxis_title="Ocorrências", yaxis=dict(gridcolor='#E2E8F0'))
         st.plotly_chart(fig2, use_container_width=True)
+    )
     
     st.markdown("<br><hr style='border-color: #E2E8F0;'><br>", unsafe_allow_html=True)
     
@@ -1775,6 +1775,22 @@ def render_cvp_module(data, ano):
     
     st.markdown("<br><hr style='border-color: #E2E8F0;'><br>", unsafe_allow_html=True)
 
+    col_chart1, col_chart2 = st.columns(2)
+    with col_chart1:
+        st.markdown(f"<h3>Ocorrências por Natureza</h3>", unsafe_allow_html=True)
+        df_natureza = data[['NATUREZA', 'TOTAL']].sort_values(by='TOTAL', ascending=True)
+        fig1 = _render_bar_chart(df_natureza, 'NATUREZA', 'TOTAL')
+        st.plotly_chart(fig1, use_container_width=True)
+
+    with col_chart2:
+        st.markdown("<h3>Evolução Mensal Macro</h3>", unsafe_allow_html=True)
+        df_meses = pd.DataFrame({'Mês': meses_cols, 'Quantidade': totais_por_mes.values})
+        fig2 = px.bar(df_meses, x='Mês', y='Quantidade', text='Quantidade')
+        fig2.update_traces(marker_color='#F59E0B', textposition='outside', textfont_size=12)
+        fig2.update_layout(plot_bgcolor='rgba(255,255,255,1)', paper_bgcolor='rgba(255,255,255,1)', font_color='#1E293B', margin=dict(l=0, r=0, t=30, b=0), xaxis_title="", yaxis_title="Ocorrências totais", yaxis=dict(gridcolor='#E2E8F0'))
+        st.plotly_chart(fig2, use_container_width=True)
+
+    st.markdown("<br><hr style='border-color: #E2E8F0;'><br>", unsafe_allow_html=True)
     st.markdown("<h3>Matriz de CVP por Natureza</h3>", unsafe_allow_html=True)
     
     # Adicionar TOTAL GERAL na matriz
@@ -1790,22 +1806,6 @@ def render_cvp_module(data, ano):
         _apply_table_style(df_exibicao, highlight_row=last_idx),
         use_container_width=True, hide_index=True
     )
-
-    st.markdown("<br><hr style='border-color: #E2E8F0;'><br>", unsafe_allow_html=True)
-    col_chart1, col_chart2 = st.columns(2)
-    with col_chart1:
-        st.markdown(f"<h3>Ocorrências por Natureza</h3>", unsafe_allow_html=True)
-        df_natureza = data[['NATUREZA', 'TOTAL']].sort_values(by='TOTAL', ascending=True)
-        fig1 = _render_bar_chart(df_natureza, 'NATUREZA', 'TOTAL')
-        st.plotly_chart(fig1, use_container_width=True)
-
-    with col_chart2:
-        st.markdown("<h3>Evolução Mensal Macro</h3>", unsafe_allow_html=True)
-        df_meses = pd.DataFrame({'Mês': meses_cols, 'Quantidade': totais_por_mes.values})
-        fig2 = px.bar(df_meses, x='Mês', y='Quantidade', text='Quantidade')
-        fig2.update_traces(marker_color='#F59E0B', textposition='outside', textfont_size=12)
-        fig2.update_layout(plot_bgcolor='rgba(255,255,255,1)', paper_bgcolor='rgba(255,255,255,1)', font_color='#1E293B', margin=dict(l=0, r=0, t=30, b=0), xaxis_title="", yaxis_title="Ocorrências totais", yaxis=dict(gridcolor='#E2E8F0'))
-        st.plotly_chart(fig2, use_container_width=True)
 
     # --- Área de Exportação Estabilizada ---
     with st.expander("📥 Preparar Relatório CVP (PDF/Excel)", expanded=False):
@@ -2300,18 +2300,10 @@ def render_home_dashboard(ano_selecionado):
         st.markdown(box_html("Prisões Realizadas", prisoes_atual, prisoes_ant, mes_comp_str, "card-blue"), unsafe_allow_html=True)
         st.markdown(box_html("Maconha Ap. (g)", drogas_mac_atual, drogas_mac_ant, mes_comp_str, "card-purple"), unsafe_allow_html=True)
 
-
-
-
-
 # ----------------- MAIN APP LOGIC -----------------
-
 render_header()
 
-
-
-
-# ---------------- NAVEGAÇÃO E SINC DE DADOS ----------------
+# ---------------- NAVEGAÇÃO PRINCIPAL E SINC DE DADOS ----------------
 nav_abas = [
     {"key": "Inicio",       "label": "Início",        "icon": ":material/home:"},
     {"key": "Consolidado",  "label": "Consolidado",   "icon": ":material/summarize:"},
@@ -2324,6 +2316,7 @@ nav_abas = [
 if "nav_aba" not in st.session_state:
     st.session_state.nav_aba = "Inicio"
 
+# Layout unificado: 6 botões de aba, 1 filtro de ano e 1 botão sync na mesma linha
 nav_cols = st.columns([1, 1, 1, 1, 1, 1, 0.8, 1.1])
 
 for i, aba in enumerate(nav_abas):
@@ -2493,4 +2486,3 @@ elif nav_sel == "Operacional":
             render_mvi_module(load_data_visita('Visita Comun', ano_selecionado), "Estatísticas de Visita Comunitária", ano_selecionado)
     except Exception as e:
         st.error(f"Erro ao carregar indicador operacional: {e}")
-
