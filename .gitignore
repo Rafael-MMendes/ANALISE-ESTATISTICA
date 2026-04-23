@@ -15,12 +15,8 @@ env/
 # Environment and Data
 .env
 cad_session.json
-dados/
 
 # Exports
-*.pdf
-*.xls
-*.xlsx
 
 # Streamlit secrets (just in case)
 .streamlit/secrets.toml
