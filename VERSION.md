@@ -6,6 +6,25 @@ O formato é baseado em [Versionamento Semântico (SemVer)](https://semver.org/l
 
 ---
 
+## [2.0.4] - 2026-04-29
+
+### [Adicionado]
+- **Interface de Sincronização Unificada**: Novo diálogo centralizado (`open_cad_auth_dialog`) que integra credenciais CAD, seleção de relatórios (NEAC/CAD) e monitoramento de progresso em tempo real.
+- **Diagnóstico Profundo**: Sistema de log aprimorado em `coleta_cad_consolidada.py` que captura o estado do navegador e o HTML da página em caso de falha crítica nos downloads.
+
+### [Alterado]
+- **Gestão de Estado da UI**: Implementação de `st.empty()` e lógica de containers exclusivos para garantir que a tela de seleção seja completamente removida após o início da coleta, eliminando sobreposições.
+- **Robô de Coleta CAD (Resiliência)**:
+  - **Descoberta Inteligente**: O robô agora busca o botão de download por múltiplos padrões (`Baixar`, `DOWNLOAD`, seletores CSS e links diretos `.xls`).
+  - **Tratamento de Janelas**: Melhora na detecção de abas de exportação do ScriptCase, com fallback automático para varredura de páginas abertas se o evento de `page` falhar.
+  - **Normalização Unicode**: Comparação de nomes de relatórios agora utiliza normalização `NFD` para evitar erros de casamento de nomes devido a acentos ou codificações distintas.
+
+### [Corrigido]
+- **Duplicidade de Botões**: Remoção de lógica redundante na barra lateral que causava a exibição de botões extras durante a sincronização.
+- **Falha de Download CAD**: Corrigido o problema onde o robô não conseguia localizar o link de download final após o processamento do relatório.
+
+---
+
 ## [2.0.3] - 2026-04-22
 
 ### [Adicionado]

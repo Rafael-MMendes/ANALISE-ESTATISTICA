@@ -7,17 +7,119 @@ import glob
 import subprocess
 import time
 
-@st.dialog("Autenticação CAD Restrita")
-def open_token_dialog():
-    st.warning("🔑 O robô do CAD solicitou o Token de Segurança.")
-    token_input = st.text_input("Insira o Token do CAD (Cole ou digite):", key="cad_token", max_chars=12)
-    if st.button("Confirmar Autenticação", use_container_width=True):
-        if token_input:
-            with open("token_response.txt", "w", encoding="utf-8") as f:
-                f.write(token_input)
-            with open("coleta_status.txt", "w", encoding="utf-8") as f:
-                f.write("RUNNING_CAD")
-            st.rerun()
+@st.dialog("Sincronização CAD & NEAC", width="large")
+def open_cad_auth_dialog():
+    # Usamos st.empty para garantir que apenas um estado seja renderizado por vez
+    dialog_placeholder = st.empty()
+    
+    with dialog_placeholder.container():
+        if not st.session_state.get('sync_active', False):
+            st.info("🔒 Insira as credenciais e selecione os relatórios para coleta.")
+            col_cred1, col_cred2 = st.columns(2)
+            with col_cred1:
+                cad_user = st.text_input("CPF (CAD):", key="cad_user_input")
+                cad_pass = st.text_input("Senha (CAD):", type="password", key="cad_pass_input")
+            with col_cred2:
+                cad_token = st.text_input("Token (E-mail/SMS):", key="cad_token_input", max_chars=12)
+            
+            st.markdown("#### 📂 Relatórios para Coleta")
+            all_reports = [
+                "CVLI", "CVP", "TENTATIVA", "PRISÕES",
+                "Veiculos Recuperados", "Armas Apreendidas", "Drogas Apreendidas",
+                "Maria da Penha", "TCO", "Mandados de Prisão", "Visitas Comunitárias"
+            ]
+            selected_reports = []
+            rep_cols = st.columns(3)
+            for i, rep in enumerate(all_reports):
+                with rep_cols[i % 3]:
+                    if st.checkbox(rep, value=True, key=f"check_{rep}"):
+                        selected_reports.append(rep)
+            
+            st.markdown("---")
+            col_main, col_exit = st.columns(2)
+            with col_main:
+                if st.button("🚀 Iniciar Coleta", use_container_width=True, type="primary"):
+                    if cad_user and cad_pass and cad_token and selected_reports:
+                        with open("cad_credentials.txt", "w", encoding="utf-8") as f:
+                            f.write(f"{cad_user}|{cad_pass}|{cad_token}")
+                        with open("selected_reports.txt", "w", encoding="utf-8") as f:
+                            f.write("\n".join(selected_reports))
+                        
+                        if os.path.exists("coleta_progresso.txt"): os.remove("coleta_progresso.txt")
+                        
+                        st.session_state.sync_active = True
+                        st.session_state.sync_proc = subprocess.Popen(
+                            ["cmd.exe", "/c", "Iniciar_Coleta.bat"],
+                            cwd=os.path.dirname(os.path.abspath(__file__))
+                        )
+                        with open("coleta_status.txt", "w", encoding="utf-8") as f:
+                            f.write("STARTING")
+                        st.rerun()
+                    elif not selected_reports: st.error("Selecione ao menos um relatório.")
+                    else: st.error("Preencha todos os campos.")
+            with col_exit:
+                if st.button("Sair", use_container_width=True, key="btn_sair_login"):
+                    st.session_state.show_auth_dialog = False
+                    st.rerun()
+        else:
+            st.markdown("### 🔄 Processando Relatórios...")
+            status_geral = "RUNNING"
+            if os.path.exists("coleta_status.txt"):
+                try:
+                    with open("coleta_status.txt", "r", encoding="utf-8") as f:
+                        status_geral = f.read().strip()
+                except: pass
+            
+            progresso = {}
+            if os.path.exists("coleta_progresso.txt"):
+                try:
+                    with open("coleta_progresso.txt", "r", encoding="utf-8") as f:
+                        for line in f:
+                            if "|" in line:
+                                r, s = line.strip().split("|")
+                                progresso[r] = s
+                except: pass
+            
+            reports = ["CVLI", "CVP", "TENTATIVA", "PRISÕES", "Veiculos Recuperados", "Armas Apreendidas", "Drogas Apreendidas", "Maria da Penha", "TCO", "Mandados de Prisão", "Visitas Comunitárias"]
+            cols = st.columns(2)
+            for i, report in enumerate(reports):
+                with cols[i % 2]:
+                    s = progresso.get(report, "PENDENTE")
+                    icon = "⚪"
+                    if s == "OK": icon = "✅"
+                    elif s == "ERRO": icon = "❌"
+                    elif s == "PROCESSANDO": icon = "⏳"
+                    st.markdown(f"{icon} **{report}**")
+
+            st.markdown("---")
+            col_main, col_exit = st.columns(2)
+            with col_main:
+                if status_geral == "FINISHED":
+                    if st.button("✅ Concluir e Sair", use_container_width=True, type="primary"):
+                        st.session_state.sync_active = False
+                        st.session_state.show_auth_dialog = False
+                        for f in ["coleta_status.txt", "cad_credentials.txt", "selected_reports.txt"]:
+                            if os.path.exists(f): os.remove(f)
+                        st.rerun()
+                else:
+                    if st.button("🛑 Interromper", use_container_width=True, type="secondary", key="btn_interromper_sync"):
+                        if hasattr(st.session_state, 'sync_proc'):
+                            try: subprocess.run(["taskkill", "/F", "/T", "/PID", str(st.session_state.sync_proc.pid)], capture_output=True)
+                            except: pass
+                        st.session_state.sync_active = False
+                        st.rerun()
+            with col_exit:
+                if st.button("Sair", use_container_width=True, key="btn_sair_sync"):
+                    st.session_state.show_auth_dialog = False
+                    st.rerun()
+
+            if status_geral != "FINISHED":
+                if hasattr(st.session_state, 'sync_proc') and st.session_state.sync_proc.poll() is not None:
+                    with open("coleta_status.txt", "w", encoding="utf-8") as f:
+                        f.write("FINISHED")
+                    st.rerun()
+                time.sleep(2)
+                st.rerun()
 import os
 from io import BytesIO
 import base64
@@ -2498,48 +2600,14 @@ with nav_cols[6]:
 with nav_cols[7]:
     if 'sync_active' not in st.session_state:
         st.session_state.sync_active = False
+    if 'show_auth_dialog' not in st.session_state:
+        st.session_state.show_auth_dialog = False
 
-    if not st.session_state.sync_active:
-        if st.button("Sync", icon=":material/sync:", use_container_width=True, type="primary"):
-            st.session_state.sync_active = True
-            if __import__('os').path.exists("coleta_status.txt"): __import__('os').remove("coleta_status.txt")
-            if __import__('os').path.exists("token_response.txt"): __import__('os').remove("token_response.txt")
-            if __import__('os').path.exists("logs/coleta_automatica.log"): __import__('os').remove("logs/coleta_automatica.log")
-            
-            st.session_state.sync_proc = __import__('subprocess').Popen(
-                ["cmd.exe", "/c", "Iniciar_Coleta.bat"],
-                cwd=__import__('os').path.dirname(__import__('os').path.abspath(__file__))
-            )
-            with open("coleta_status.txt", "w", encoding="utf-8") as f:
-                f.write("STARTING")
-            st.rerun()
-    else:
-        status = "STARTING"
-        if __import__('os').path.exists("coleta_status.txt"):
-            try:
-                with open("coleta_status.txt", "r", encoding="utf-8") as f:
-                    status = f.read().strip()
-            except: pass
-        
-        if status == "WAITING_TOKEN":
-            st.info("Aguardando Token...")
-            open_token_dialog()
-        elif status == "FINISHED":
-            st.success("Concluído")
-            if st.button("OK", use_container_width=True):
-                st.session_state.sync_active = False
-                if __import__('os').path.exists("coleta_status.txt"): __import__('os').remove("coleta_status.txt")
-                st.rerun()
-        else:
-            st.info(f"⏳ Processando...")
-            if hasattr(st.session_state, 'sync_proc') and st.session_state.sync_proc.poll() is not None:
-                if status != "FINISHED":
-                    with open("coleta_status.txt", "w", encoding="utf-8") as f:
-                        f.write("FINISHED")
-                    st.rerun()
-            
-            __import__('time').sleep(2.5)
-            st.rerun()
+    if st.button("Sync", icon=":material/sync:", use_container_width=True, type="primary"):
+        st.session_state.show_auth_dialog = True
+    
+    if st.session_state.show_auth_dialog or st.session_state.sync_active:
+        open_cad_auth_dialog()
 
 st.markdown("---")
 

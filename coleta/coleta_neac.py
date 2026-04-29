@@ -34,7 +34,7 @@ if sys.platform == "win32":
 load_dotenv()
 
 ANO          = str(datetime.datetime.now().year)
-BASE_DIR     = Path(__file__).parent
+BASE_DIR     = Path(__file__).parent.parent
 DESTINO_DIR  = BASE_DIR / "dados" / ANO
 LOG_FILE     = BASE_DIR / "coleta_neac.log"
 
@@ -49,6 +49,23 @@ def log(msg: str):
     print(linha)
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(linha + "\n")
+
+def update_report_status(report_name, status):
+    progress_file = Path(__file__).parent.parent / "coleta_progresso.txt"
+    progress = {}
+    if progress_file.exists():
+        try:
+            with open(progress_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    if "|" in line:
+                        r, s = line.strip().split("|")
+                        progress[r] = s
+        except: pass
+    
+    progress[report_name] = status
+    with open(progress_file, "w", encoding="utf-8") as f:
+        for r, s in progress.items():
+            f.write(f"{r}|{s}\n")
 
 async def fazer_login(page, user: str, password: str):
     log("Acessando NEAC Pentaho...")
@@ -326,24 +343,44 @@ async def main():
             await fazer_login(page, USER, PASS)
             
             # Relatórios a baixar
-            jobs = [
+            jobs_all = [
                 ("CVLI", download_cvli),
                 ("CVP", download_cvp),
                 ("TENTATIVA", download_tentativa),
                 ("PRISÕES", download_prisões)
             ]
             
+            import unicodedata
+            def normalize_str(s):
+                return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn').lower()
+
+            # Filtra pelos selecionados
+            sel_file = Path(__file__).parent.parent / "selected_reports.txt"
+            selected = []
+            if sel_file.exists():
+                with open(sel_file, "r", encoding="utf-8") as f:
+                    selected = [normalize_str(line.strip()) for line in f if line.strip()]
+            
+            jobs = [j for j in jobs_all if normalize_str(j[0]) in selected] if selected else jobs_all
+            
+            if not jobs:
+                log("Nenhum relatório do NEAC selecionado. Pulando.")
+                return
+
             resultados = {}
             for nome, func in jobs:
                 try:
+                    update_report_status(nome, "PROCESSANDO")
                     nav = await ir_para_home_e_abrir_browser(page)
                     res = await func(page, nav, ANO)
                     resultados[nome] = res
+                    update_report_status(nome, "OK" if res else "ERRO")
                 except Exception as e:
                     log(f"Erro em {nome}: {e}")
                     ts = datetime.datetime.now().strftime("%H%M%S")
                     await page.screenshot(path=f"erro_{nome}_{ts}.png")
                     resultados[nome] = False
+                    update_report_status(nome, "ERRO")
 
             log("\n" + "="*30)
             log(f"RESUMO FINAL:")
