@@ -1,0 +1,7 @@
+Veiculos Recuperados|OK
+Armas Apreendidas|OK
+Drogas Apreendidas|OK
+Maria da Penha|OK
+TCO|OK
+Mandados de Prisão|OK
+Visitas Comunitárias|OK
