@@ -7,120 +7,67 @@ import glob
 import subprocess
 import time
 
-@st.dialog("Sincronização CAD & NEAC", width="large")
-def open_cad_auth_dialog():
-    # Usamos st.empty para garantir que apenas um estado seja renderizado por vez
-    dialog_placeholder = st.empty()
+import datetime
+
+def get_ultima_atualizacao() -> str:
+    """Retorna a data/hora da última atualização dos dados lendo o log de coleta."""
+    log_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", "coleta_automatica.log")
+    if not os.path.exists(log_file):
+        return None
+    try:
+        with open(log_file, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+        # Procura a última linha com 'Finalizada'
+        for line in reversed(lines):
+            if 'Finalizada' in line or 'Finalizado' in line or 'completa finalizada' in line:
+                # Extrai timestamp do formato [YYYY-MM-DD HH:MM:SS]
+                import re
+                m = re.search(r'\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]', line)
+                if m:
+                    dt = datetime.datetime.strptime(m.group(1), '%Y-%m-%d %H:%M:%S')
+                    return dt.strftime('%d/%m/%Y às %H:%Mh')
+    except Exception:
+        pass
+    return None
+
+def iniciar_coleta_background():
+    """Dispara a coleta completa (NEAC + CAD) em background silenciosamente."""
+    try:
+        proc = subprocess.Popen(
+            ["cmd.exe", "/c", "Iniciar_Coleta.bat"],
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+            creationflags=subprocess.CREATE_NO_WINDOW
+        )
+        st.session_state.sync_proc = proc
+        st.session_state.sync_active = True
+        st.session_state.sync_start_time = datetime.datetime.now()
+    except Exception as e:
+        st.session_state.sync_active = False
+
+def verificar_autosync():
+    """Verifica se a coleta já rodou hoje. Se não, dispara automaticamente."""
+    hoje = datetime.date.today().isoformat()
+    ultimo_sync_dia = st.session_state.get('ultimo_sync_dia', None)
     
-    with dialog_placeholder.container():
-        if not st.session_state.get('sync_active', False):
-            st.info("🔒 Insira as credenciais e selecione os relatórios para coleta.")
-            col_cred1, col_cred2 = st.columns(2)
-            with col_cred1:
-                cad_user = st.text_input("CPF (CAD):", key="cad_user_input")
-                cad_pass = st.text_input("Senha (CAD):", type="password", key="cad_pass_input")
-            with col_cred2:
-                cad_token = st.text_input("Token (E-mail/SMS):", key="cad_token_input", max_chars=12)
-            
-            st.markdown("#### 📂 Relatórios para Coleta")
-            all_reports = [
-                "CVLI", "CVP", "TENTATIVA", "PRISÕES",
-                "Veiculos Recuperados", "Armas Apreendidas", "Drogas Apreendidas",
-                "Maria da Penha", "TCO", "Mandados de Prisão", "Visitas Comunitárias"
-            ]
-            selected_reports = []
-            rep_cols = st.columns(3)
-            for i, rep in enumerate(all_reports):
-                with rep_cols[i % 3]:
-                    if st.checkbox(rep, value=True, key=f"check_{rep}"):
-                        selected_reports.append(rep)
-            
-            st.markdown("---")
-            col_main, col_exit = st.columns(2)
-            with col_main:
-                if st.button("🚀 Iniciar Coleta", use_container_width=True, type="primary"):
-                    if cad_user and cad_pass and cad_token and selected_reports:
-                        with open("cad_credentials.txt", "w", encoding="utf-8") as f:
-                            f.write(f"{cad_user}|{cad_pass}|{cad_token}")
-                        with open("selected_reports.txt", "w", encoding="utf-8") as f:
-                            f.write("\n".join(selected_reports))
-                        
-                        if os.path.exists("coleta_progresso.txt"): os.remove("coleta_progresso.txt")
-                        
-                        st.session_state.sync_active = True
-                        st.session_state.sync_proc = subprocess.Popen(
-                            ["cmd.exe", "/c", "Iniciar_Coleta.bat"],
-                            cwd=os.path.dirname(os.path.abspath(__file__))
-                        )
-                        with open("coleta_status.txt", "w", encoding="utf-8") as f:
-                            f.write("STARTING")
-                        st.rerun()
-                    elif not selected_reports: st.error("Selecione ao menos um relatório.")
-                    else: st.error("Preencha todos os campos.")
-            with col_exit:
-                if st.button("Sair", use_container_width=True, key="btn_sair_login"):
-                    st.session_state.show_auth_dialog = False
-                    st.rerun()
-        else:
-            st.markdown("### 🔄 Processando Relatórios...")
-            status_geral = "RUNNING"
-            if os.path.exists("coleta_status.txt"):
-                try:
-                    with open("coleta_status.txt", "r", encoding="utf-8") as f:
-                        status_geral = f.read().strip()
-                except: pass
-            
-            progresso = {}
-            if os.path.exists("coleta_progresso.txt"):
-                try:
-                    with open("coleta_progresso.txt", "r", encoding="utf-8") as f:
-                        for line in f:
-                            if "|" in line:
-                                r, s = line.strip().split("|")
-                                progresso[r] = s
-                except: pass
-            
-            reports = ["CVLI", "CVP", "TENTATIVA", "PRISÕES", "Veiculos Recuperados", "Armas Apreendidas", "Drogas Apreendidas", "Maria da Penha", "TCO", "Mandados de Prisão", "Visitas Comunitárias"]
-            cols = st.columns(2)
-            for i, report in enumerate(reports):
-                with cols[i % 2]:
-                    s = progresso.get(report, "PENDENTE")
-                    icon = "⚪"
-                    if s == "OK": icon = "✅"
-                    elif s == "ERRO": icon = "❌"
-                    elif s == "PROCESSANDO": icon = "⏳"
-                    st.markdown(f"{icon} **{report}**")
+    if ultimo_sync_dia != hoje and not st.session_state.get('sync_active', False):
+        st.session_state.ultimo_sync_dia = hoje
+        iniciar_coleta_background()
 
-            st.markdown("---")
-            col_main, col_exit = st.columns(2)
-            with col_main:
-                if status_geral == "FINISHED":
-                    if st.button("✅ Concluir e Sair", use_container_width=True, type="primary"):
-                        st.session_state.sync_active = False
-                        st.session_state.show_auth_dialog = False
-                        for f in ["coleta_status.txt", "cad_credentials.txt", "selected_reports.txt"]:
-                            if os.path.exists(f): os.remove(f)
-                        st.rerun()
-                else:
-                    if st.button("🛑 Interromper", use_container_width=True, type="secondary", key="btn_interromper_sync"):
-                        if hasattr(st.session_state, 'sync_proc'):
-                            try: subprocess.run(["taskkill", "/F", "/T", "/PID", str(st.session_state.sync_proc.pid)], capture_output=True)
-                            except: pass
-                        st.session_state.sync_active = False
-                        st.rerun()
-            with col_exit:
-                if st.button("Sair", use_container_width=True, key="btn_sair_sync"):
-                    st.session_state.show_auth_dialog = False
-                    st.rerun()
+def verificar_sync_finalizado():
+    """Checa se o processo de coleta em background terminou."""
+    if st.session_state.get('sync_active', False):
+        proc = st.session_state.get('sync_proc', None)
+        if proc and proc.poll() is not None:
+            st.session_state.sync_active = False
+            st.rerun()
 
-            if status_geral != "FINISHED":
-                if hasattr(st.session_state, 'sync_proc') and st.session_state.sync_proc.poll() is not None:
-                    with open("coleta_status.txt", "w", encoding="utf-8") as f:
-                        f.write("FINISHED")
-                    st.rerun()
-                time.sleep(2)
-                st.rerun()
+
+def open_cad_auth_dialog():
+    """Mantido apenas por compatibilidade. Não abre mais diálogo — coleta é auto-silenciosa."""
+    pass
+
 import os
+
 from io import BytesIO
 import base64
 from fpdf import FPDF, FontFace
@@ -2600,14 +2547,40 @@ with nav_cols[6]:
 with nav_cols[7]:
     if 'sync_active' not in st.session_state:
         st.session_state.sync_active = False
-    if 'show_auth_dialog' not in st.session_state:
-        st.session_state.show_auth_dialog = False
 
-    if st.button("Sync", icon=":material/sync:", use_container_width=True, type="primary"):
-        st.session_state.show_auth_dialog = True
-    
-    if st.session_state.show_auth_dialog or st.session_state.sync_active:
-        open_cad_auth_dialog()
+    # Auto-Sync: dispara coleta na primeira abertura do dia
+    verificar_autosync()
+    verificar_sync_finalizado()
+
+    ultima_atualizacao = get_ultima_atualizacao()
+    if st.session_state.get('sync_active', False):
+        inicio = st.session_state.get('sync_start_time')
+        elapsed = ''
+        if inicio:
+            seg = int((datetime.datetime.now() - inicio).total_seconds())
+            elapsed = f' ({seg}s)'
+        st.markdown(
+            f'<div style="background:rgba(251,191,36,0.15);border:1px solid #f59e0b;border-radius:8px;padding:6px 10px;text-align:center;font-size:11px;color:#92400e;line-height:1.4">'
+            f'<span style="font-size:16px">⏳</span><br><b>Atualizando dados{elapsed}...</b>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+        time.sleep(3)
+        st.rerun()
+    elif ultima_atualizacao:
+        st.markdown(
+            f'<div style="background:rgba(16,185,129,0.1);border:1px solid #10b981;border-radius:8px;padding:6px 10px;text-align:center;font-size:11px;color:#065f46;line-height:1.4">'
+            f'<span style="font-size:16px">✅</span><br><b>Dados Atualizados</b><br>{ultima_atualizacao}'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+    else:
+        st.markdown(
+            f'<div style="background:rgba(107,114,128,0.1);border:1px solid #6b7280;border-radius:8px;padding:6px 10px;text-align:center;font-size:11px;color:#374151;line-height:1.4">'
+            f'<span style="font-size:16px">📊</span><br><b>Coletando dados...</b>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
 
 st.markdown("---")
 

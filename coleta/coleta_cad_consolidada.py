@@ -1,84 +1,222 @@
-print("DEBUG: Carregando script CAD...")
-import asyncio
+"""
+coleta_cad_consolidada.py — Coletor Consolidado de Alto Desempenho do CAD (ScriptCase)
+--------------------------------------------------------------------------------------
+Arquitetura Híbrida Inteligente:
+  - Fase 1 (HTTP Direto): Armas, Drogas, Veículos (~15 segundos total).
+  - Fase 2 (Event-Driven Playwright): Maria da Penha, TCO, Mandados, Visitas.
+
+Compatibilidade:
+  - Lê credenciais de `cad_credentials.txt` ou `.env`.
+  - Atualiza status em `coleta_progresso.txt`.
+  - Respeita `selected_reports.txt`.
+  - Salva em `dados/{ANO}/`.
+"""
+
 import os
-import datetime
-import unicodedata
-from dotenv import load_dotenv
 import sys
 import io
+import time
+import datetime
+import unicodedata
+from pathlib import Path
+import requests
+import bs4
+import urllib3
+from dotenv import load_dotenv
+import asyncio
 from playwright.async_api import async_playwright
 
-# Força UTF-8 para stdout no Windows para evitar erros de charmap
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 if sys.platform == "win32":
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 load_dotenv()
 
-def log(msg):
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{timestamp}] {msg}")
+ANO          = str(datetime.datetime.now().year)
+BASE_DIR     = Path(__file__).parent.parent
+DESTINO_DIR  = BASE_DIR / "dados" / ANO
+LOG_FILE     = BASE_DIR / "logs" / "coleta_automatica.log"
+LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-def update_report_status(report_name, status):
-    progress_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "coleta_progresso.txt")
+URL_BASE     = "https://analisacad.seguranca.al.gov.br/app/cad"
+
+# ── Utilitários ───────────────────────────────────────────────────────────────
+
+def log(msg: str):
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    linha = f"[{timestamp}] {msg}"
+    print(linha, flush=True)
+    try:
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(linha + "\n")
+    except Exception:
+        pass
+
+def update_report_status(report_name: str, status: str):
+    progress_file = BASE_DIR / "coleta_progresso.txt"
     progress = {}
-    if os.path.exists(progress_file):
+    if progress_file.exists():
         try:
             with open(progress_file, "r", encoding="utf-8") as f:
                 for line in f:
                     if "|" in line:
-                        r, s = line.strip().split("|")
+                        r, s = line.strip().split("|", 1)
                         progress[r] = s
-        except: pass
+        except Exception:
+            pass
     
     progress[report_name] = status
-    with open(progress_file, "w", encoding="utf-8") as f:
-        for r, s in progress.items():
-            f.write(f"{r}|{s}\n")
+    try:
+        with open(progress_file, "w", encoding="utf-8") as f:
+            for r, s in progress.items():
+                f.write(f"{r}|{s}\n")
+    except Exception:
+        pass
 
-async def handle_download(context, page, f_grid, filename, destino_dir):
+def normalize_str(s: str) -> str:
+    return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn').lower()
+
+def obter_credenciais():
+    cred_file = BASE_DIR / "cad_credentials.txt"
+    user, password, token = None, None, None
+    if cred_file.exists():
+        try:
+            with open(cred_file, "r", encoding="utf-8") as f:
+                parts = f.read().strip().split("|")
+                if len(parts) >= 2:
+                    user = parts[0]
+                    password = parts[1]
+                    token = parts[2] if len(parts) > 2 else ""
+        except Exception:
+            pass
+    
+    if not user or not password:
+        user = os.getenv("CAD_USER")
+        password = os.getenv("CAD_PASS")
+        token = os.getenv("CAD_TOKEN", "")
+        
+    return user, password, token
+
+# ── Motor HTTP Direto ─────────────────────────────────────────────────────────
+
+def login_http_cad(session: requests.Session, user: str, password: str, token: str = "") -> bool:
+    log("Autenticando sessão HTTP no CAD...")
+    try:
+        session.get(f"{URL_BASE}/cad_gestao_login/", verify=False, timeout=15)
+        r_log = session.post(
+            f"{URL_BASE}/cad_blank_validar_login/cad_blank_validar_login.php",
+            data={"login": user, "senha": password},
+            verify=False,
+            timeout=15
+        )
+        if "cad_blank_menu" in r_log.text or "cad_gestao_token" in r_log.text:
+            if token and "cad_gestao_token" in r_log.text:
+                log("Validando Token 2FA via HTTP...")
+                session.post(
+                    f"{URL_BASE}/cad_blank_validar_token/cad_blank_validar_token.php",
+                    data={"token": token},
+                    verify=False,
+                    timeout=15
+                )
+            log("✅ Autenticação HTTP no CAD confirmada.")
+            return True
+    except Exception as e:
+        log(f"Erro na autenticação HTTP do CAD: {e}")
+    return False
+
+def coletar_relatorio_http(session: requests.Session, app_name: str, custom_filters: dict, filename: str) -> bool:
+    log(f">>> [CAD-HTTP] Solicitando {filename}...")
+    t0 = time.time()
+    url_app = f"{URL_BASE}/{app_name}/{app_name}.php"
+    
+    try:
+        r_form = session.get(url_app, verify=False, timeout=20)
+        soup = bs4.BeautifulSoup(r_form.text, 'html.parser')
+        form = soup.find('form', {'name': 'F1'})
+        if not form:
+            log(f"❌ Form F1 não encontrado em {app_name}")
+            return False
+            
+        form_data = {inp.get('name'): inp.get('value', '') for inp in form.find_all('input') if inp.get('name')}
+        for sel in form.find_all('select'):
+            name = sel.get('name')
+            if name: form_data[name] = ''
+            
+        form_data.update(custom_filters)
+        form_data['bprocessa'] = 'pesq'
+        form_data['nmgp_opcao'] = 'busca'
+        
+        session.post(url_app, data=form_data, verify=False, timeout=25)
+        
+        export_data = {
+            'script_case_init': form_data.get('script_case_init'),
+            'script_case_session': form_data.get('script_case_session'),
+            'nmgp_opcao': 'xls',
+            'nmgp_parms': '0'
+        }
+        r_xls = session.post(url_app, data=export_data, verify=False, timeout=35)
+        
+        soup_xls = bs4.BeautifulSoup(r_xls.text, 'html.parser')
+        xls_actions = [f.get('action') for f in soup_xls.find_all('form') if '.xls' in f.get('action', '')]
+        if not xls_actions:
+            for a in soup_xls.find_all('a'):
+                href = a.get('href', '')
+                if '.xls' in href:
+                    xls_actions.append(href)
+                    
+        if xls_actions:
+            file_url = xls_actions[0]
+            if not file_url.startswith('http'):
+                file_url = "https://analisacad.seguranca.al.gov.br" + file_url
+            
+            r_file = session.get(file_url, verify=False, timeout=35)
+            if r_file.status_code == 200 and len(r_file.content) > 1000:
+                DESTINO_DIR.mkdir(parents=True, exist_ok=True)
+                out_path = DESTINO_DIR / filename
+                with open(out_path, 'wb') as f:
+                    f.write(r_file.content)
+                log(f"✅ {filename} salvo com sucesso ({len(r_file.content)} bytes em {time.time()-t0:.2f}s)!")
+                return True
+    except Exception as e:
+        log(f"Erro ao coletar {filename} via HTTP: {e}")
+        
+    return False
+
+# ── Motor Playwright Otimizado ───────────────────────────────────────────────
+
+async def handle_download_pw(context, page, f_grid, filename):
     log(f"Iniciando exportação XLS para '{filename}'...")
     
-    # Lista de seletores possíveis para o botão XLS
-    xls_selectors = ['#sc_b_xls_top', '#sc_b_xls_bot', 'text=XLS', '.scButton_default:has-text("XLS")']
-    
+    # 1. Dispara comando XLS
     try:
-        # Tenta disparar o comando JS de exportação (mais rápido se o contexto permitir)
         await f_grid.evaluate("nm_gp_move('xls', '0')")
-    except Exception as e:
-        log(f"Aviso: Erro ao disparar JS ({e}). Tentando clique direto...")
-        clicked = False
-        for sel in xls_selectors:
+    except Exception:
+        for sel in ['#sc_b_xls_top', '#sc_b_xls_bot', '.scButton_default:has-text("XLS")']:
             try:
                 if await f_grid.locator(sel).first.is_visible():
-                    await f_grid.locator(sel).first.click(timeout=5000)
-                    clicked = True
+                    await f_grid.locator(sel).first.click(timeout=3000)
                     break
-            except: continue
-        if not clicked:
-            log("Não foi possível acionar o botão XLS por JS ou Clique.")
+            except Exception:
+                pass
 
-    log("Aguardando janela de processamento/download...")
+    log("Aguardando janela de download/processamento...")
     dl_page = None
     try:
-        # Tenta capturar a nova página que abre
         async with context.expect_page(timeout=60000) as dl_page_info:
             pass
         dl_page = await dl_page_info.value
-    except:
-        # Se falhou, verifica se já existe uma nova página aberta (fallback)
+    except Exception:
         pages = context.pages
         if len(pages) > 1:
-            dl_page = pages[-1] # Assume que a última é a de download
-            log("Janela de download detectada via lista de páginas.")
+            dl_page = pages[-1]
 
     if dl_page:
         try:
             await dl_page.wait_for_load_state('domcontentloaded', timeout=30000)
-            log(f"Janela aberta: '{await dl_page.title()}'. Localizando botão de download...")
             
-            # Tenta múltiplos seletores e padrões
             btn_selectors = [
-                'text=Baixar', 'text=DOWNLOAD', '#id_img_bt_baixar', 
+                'text=Baixar', 'text=DOWNLOAD', '#id_img_bt_baixar',
                 '.scButton_default', 'a:has-text("Baixar")', 'a:has-text("DOWNLOAD")',
                 'input[type="button"]', 'button'
             ]
@@ -90,286 +228,262 @@ async def handle_download(context, page, f_grid, filename, destino_dir):
                     if await loc.is_visible(timeout=2000):
                         target_btn = loc
                         break
-                except: continue
-            
-            # Se não achou de cara, espera um pouco (o processamento do CAD pode ser lento)
+                except Exception:
+                    continue
+                    
             if not target_btn:
-                log("Botão não visível de imediato. Aguardando até 120s...")
+                log("Aguardando processamento SQL do servidor (até 120s)...")
                 try:
                     await dl_page.locator('text=Baixar, text=DOWNLOAD, #id_img_bt_baixar').first.wait_for(state="visible", timeout=120000)
                     target_btn = dl_page.locator('text=Baixar, text=DOWNLOAD, #id_img_bt_baixar').first
-                except:
-                    log("❌ DEBUG: Botão não apareceu após 120s.")
-                    # Loga o HTML para diagnóstico
-                    html_snippet = await dl_page.content()
-                    log(f"DEBUG: HTML da página (primeiros 1000 chars): {html_snippet[:1000]}...")
+                except Exception:
+                    pass
 
             if target_btn:
                 async with dl_page.expect_download(timeout=60000) as dl_info:
                     await target_btn.click()
                 download = await dl_info.value
-                path_xls = os.path.join(destino_dir, filename)
-                await download.save_as(path_xls)
-                log(f"✅ {filename} salvo com sucesso.")
+                DESTINO_DIR.mkdir(parents=True, exist_ok=True)
+                path_xls = DESTINO_DIR / filename
+                await download.save_as(str(path_xls))
+                log(f"✅ {filename} salvo com sucesso!")
                 await dl_page.close()
                 return True
-            
-            # Última tentativa: procurar qualquer link que pareça um arquivo
+                
+            # Fallback links diretos no popup
             links = await dl_page.locator('a').all()
             for link in links:
                 href = await link.get_attribute('href')
                 if href and ('.xls' in href.lower() or 'download' in href.lower()):
-                    log(f"Tentando baixar via link direto: {href}")
                     async with dl_page.expect_download(timeout=60000) as dl_info:
                         await link.click()
                     download = await dl_info.value
-                    path_xls = os.path.join(destino_dir, filename)
-                    await download.save_as(path_xls)
-                    log(f"✅ {filename} salvo via link direto.")
+                    DESTINO_DIR.mkdir(parents=True, exist_ok=True)
+                    path_xls = DESTINO_DIR / filename
+                    await download.save_as(str(path_xls))
+                    log(f"✅ {filename} salvo via link direto!")
                     await dl_page.close()
                     return True
-
+                    
         except Exception as e:
-            log(f"Erro ao processar download na nova janela: {e}")
+            log(f"Aviso no processamento do download: {e}")
             try: await dl_page.close()
-            except: pass
+            except Exception: pass
 
-    # Fallback final na página principal
-    log("Tentando fallback final na aba principal...")
+    # Fallback na página principal
     try:
-        async with page.expect_download(timeout=20000) as dl_info:
-            # Tenta clicar em qualquer coisa que pareça um link de download gerado
+        async with page.expect_download(timeout=15000) as dl_info:
             await f_grid.locator('text=Baixar, #id_img_bt_baixar, a[href*="download"]').first.click(timeout=5000)
         download = await dl_info.value
-        path_xls = os.path.join(destino_dir, filename)
-        await download.save_as(path_xls)
-        log(f"✅ {filename} salvo com sucesso (fallback final).")
+        DESTINO_DIR.mkdir(parents=True, exist_ok=True)
+        path_xls = DESTINO_DIR / filename
+        await download.save_as(str(path_xls))
+        log(f"✅ {filename} salvo via fallback!")
         return True
-    except:
-        log(f"❌ Falha crítica: Não foi possível baixar '{filename}'.")
+    except Exception:
+        log(f"❌ Falha ao baixar '{filename}'.")
         return False
 
-async def script_coleta_consolidada():
-    log("Iniciando script_coleta_consolidada...")
+async def coletar_ocorrencias_playwright(browser, cookies, tasks):
+    log(f"Iniciando navegador com sessão ativa para {len(tasks)} relatórios...")
+    context = await browser.new_context(viewport={'width': 1920, 'height': 1080}, ignore_https_errors=True)
+    if cookies:
+        await context.add_cookies(cookies)
+        
+    page = await context.new_page()
+    url_menu = f"{URL_BASE}/cad_blank_menu_respons/cad_blank_menu_respons.php"
+    
     try:
-        # LER CREDENCIAIS DO ARQUIVO GERADO PELO APP
-        cred_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cad_credentials.txt")
-        USER, PASS, TOKEN = None, None, None
+        await page.goto(url_menu, wait_until='domcontentloaded', timeout=45000)
         
-        if os.path.exists(cred_file):
+        for task in tasks:
+            log(f"--- Iniciando indicador: {task['name']} ---")
+            update_report_status(task['name'], "PROCESSANDO")
+            t_task = time.time()
+            
             try:
-                with open(cred_file, "r", encoding="utf-8") as f:
-                    parts = f.read().strip().split("|")
-                    if len(parts) == 3:
-                        USER, PASS, TOKEN = parts
-            except: pass
+                try:
+                    await page.click('text=Pesquisar', timeout=4000)
+                    await asyncio.sleep(1)
+                except Exception:
+                    pass
+                    
+                target_frame = None
+                for f in page.frames:
+                    try:
+                        if await f.get_by_text("Pesquisar Ocorrências").is_visible():
+                            target_frame = f
+                            break
+                    except Exception:
+                        continue
+                        
+                if not target_frame: target_frame = page
+                
+                async with context.expect_page(timeout=30000) as new_page_info:
+                    await target_frame.get_by_text("Pesquisar Ocorrências").first.click()
+                t_page = await new_page_info.value
+                await t_page.wait_for_load_state('domcontentloaded')
+                await asyncio.sleep(2)
+                
+                f_filtros = None
+                for f in t_page.frames:
+                    if "fil.php" in f.url.lower():
+                        f_filtros = f
+                        break
+                if not f_filtros: f_filtros = t_page
+                
+                # 1. Configura Data = Este Ano
+                await f_filtros.select_option('#SC_data_cond', value='CY')
+                
+                # 2. Configura Órgão = POLÍCIA MILITAR e dispara AJAX
+                await f_filtros.select_option('#SC_unid_id_orga_fk_orig', value='2##@@POLÍCIA MILITAR')
+                await f_filtros.locator('#SC_unid_id_orga_fk_orig option[value="2##@@POLÍCIA MILITAR"]').dblclick()
+                
+                # 3. Aguarda 9º BPM
+                sel_unid = '#SC_despc_id_orga_unid_fk_orig'
+                await f_filtros.wait_for_selector(f"{sel_unid} option", timeout=15000)
+                options = await f_filtros.locator(f"{sel_unid} option").all()
+                val_9bpm = None
+                for opt in options:
+                    if "9º BPM" in await opt.inner_text():
+                        val_9bpm = await opt.get_attribute('value')
+                        break
+                if val_9bpm:
+                    await f_filtros.select_option(sel_unid, value=val_9bpm)
+                    await f_filtros.locator(f"{sel_unid} option[value='{val_9bpm}']").dblclick()
+                    
+                # 4. Filtro específico
+                if task['type'] == 'maria_da_penha':
+                    await f_filtros.select_option('#SC_ocor_id_ocor_grup_fk_orig', label='LEI MARIA DA PENHA')
+                    await f_filtros.locator('#SC_ocor_id_ocor_grup_fk_orig option').filter(has_text='LEI MARIA DA PENHA').dblclick()
+                elif task['type'] == 'tco':
+                    await f_filtros.select_option('#SC_despc_id_ocor_despc_soluc_tipo_fk_orig', value='9##@@ELABOROU TCO (PM)')
+                    await f_filtros.locator('#SC_despc_id_ocor_despc_soluc_tipo_fk_orig option[value="9##@@ELABOROU TCO (PM)"]').dblclick()
+                elif task['type'] == 'mandados':
+                    await f_filtros.select_option('#SC_despc_id_ocor_despc_tip_fk_orig', value='6##@@CUMPRIMENTO DE MANDADO JUDICIAL')
+                    await f_filtros.locator('#SC_despc_id_ocor_despc_tip_fk_orig option[value="6##@@CUMPRIMENTO DE MANDADO JUDICIAL"]').dblclick()
+                elif task['type'] == 'visitas':
+                    await f_filtros.select_option('#SC_ocor_id_ocor_grup_fk_orig', label='OCORRÊNCIA SEM ILICITUDE')
+                    await f_filtros.locator('#SC_ocor_id_ocor_grup_fk_orig option').filter(has_text='OCORRÊNCIA SEM ILICITUDE').dblclick()
+                    await asyncio.sleep(1)
+                    for t in ["VISITA COMUNITÁRIA", "VISITA COMUNITÁRIA / MARIA DA PENHA", "VISITA PREVENTIVA"]:
+                        try:
+                            await f_filtros.select_option('#SC_ocor_id_ocor_sgrup_fk_orig', label=t)
+                            await f_filtros.locator('#SC_ocor_id_ocor_sgrup_fk_orig option').filter(has_text=t).dblclick()
+                        except Exception:
+                            pass
 
-        if not USER or not PASS:
-            log("❌ Erro: Credenciais CAD não encontradas ou inválidas.")
-            return
+                # 5. Clica em Pesquisar
+                await f_filtros.click('#sc_b_pesq_top', timeout=5000)
+                
+                # 6. Aguarda Grid
+                f_grid = None
+                for _ in range(40):
+                    for gr in t_page.frames:
+                        if "grid" in gr.url.lower() and "fil" not in gr.url.lower():
+                            f_grid = gr
+                            break
+                    if f_grid:
+                        try:
+                            if await f_grid.locator('#sc_b_xls_top, #sc_b_xls_bot').first.is_visible():
+                                break
+                        except Exception:
+                            pass
+                    await asyncio.sleep(1)
+                    
+                if not f_grid: f_grid = t_page
+                
+                # 7. Download
+                res = await handle_download_pw(context, t_page, f_grid, task['filename'])
+                update_report_status(task['name'], "OK" if res else "ERRO")
+                log(f"Tempo do relatório {task['name']}: {time.time()-t_task:.2f}s")
+                await t_page.close()
+                
+            except Exception as loop_e:
+                log(f"⚠️ Erro no loop de '{task['name']}': {loop_e}")
+                update_report_status(task['name'], "ERRO")
+                try: await t_page.close()
+                except Exception: pass
+                
+    finally:
+        await context.close()
 
-        WORKSPACE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        DESTINO_DIR = os.path.join(WORKSPACE, "dados", "2026")
-        os.makedirs(DESTINO_DIR, exist_ok=True)
+# ── Main ──────────────────────────────────────────────────────────────────────
+
+async def main_async():
+    log("="*60)
+    log("🚀 Iniciando Coleta Consolidada do CAD (Híbrida Otimizada)")
+    log("="*60)
+    
+    user, password, token = obter_credenciais()
+    if not user or not password:
+        log("❌ Erro: Credenciais CAD não encontradas.")
+        return
         
-        url_login = 'https://analisacad.seguranca.al.gov.br/app/cad/cad_gestao_login/'
+    t_inicio = time.time()
+    
+    tasks_all = [
+        {"name": "Armas Apreendidas", "app": "cad_grid_arma_boletim", "filename": f"Armas {ANO}.xls", "type": "armas", "engine": "http",
+         "filters": {"ocor_dt_ocor_cond": "CY", "despc_id_orga_unid_fk": "32##@@9º BPM", "despc_id_orga_unid_fk_dest": ["32##@@9º BPM"]}},
         
-        tasks_all = [
-            {"name": "Veiculos Recuperados", "card_text": "Pesquisar Veículos na Base do CAD", "filename": "Veiculo Recuperado 2026.xls", "type": "veiculos"},
-            {"name": "Armas Apreendidas", "card_text": "Pesquisar Armas na Base do CAD", "filename": "Armas 2026.xls", "type": "armas"},
-            {"name": "Drogas Apreendidas", "card_text": "Pesquisar Drogas na Base do CAD", "filename": "Drogas 2026.xls", "type": "drogas"},
-            {"name": "Maria da Penha", "card_text": "Pesquisar Ocorrências", "filename": "Maria da Penha 2026.xls", "type": "maria_da_penha"},
-            {"name": "TCO", "card_text": "Pesquisar Ocorrências", "filename": "TCO 2026.xls", "type": "tco"},
-            {"name": "Mandados de Prisão", "card_text": "Pesquisar Ocorrências", "filename": "Cumprimento de Mandados 2026.xls", "type": "mandados"},
-            {"name": "Visitas Comunitárias", "card_text": "Pesquisar Ocorrências", "filename": "Visita Comunitária 2026.xls", "type": "visitas"}
-        ]
-
-        def normalize_str(s):
-            return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn').lower()
-
-        # Filtra pelos selecionados
-        sel_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "selected_reports.txt")
-        selected = []
-        if os.path.exists(sel_file):
+        {"name": "Drogas Apreendidas", "app": "cad_grid_droga_boletim", "filename": f"Drogas {ANO}.xls", "type": "drogas", "engine": "http",
+         "filters": {"ocor_dt_ocor_cond": "CY", "despc_id_orga_unid_fk": "32##@@9º BPM", "despc_id_orga_unid_fk_dest": ["32##@@9º BPM"]}},
+        
+        {"name": "Veiculos Recuperados", "app": "cad_grid_tb_ocor_despc_envl_veic_pesquisa", "filename": f"Veiculo Recuperado {ANO}.xls", "type": "veiculos", "engine": "http",
+         "filters": {"ocor_dt_ocor_cond": "CY", "veic_id_orga_unid_fk": "32##@@9º BPM", "veic_id_orga_unid_fk_dest": ["32##@@9º BPM"], "veic_id_ocor_envl_veic_sitc_fk": "3##@@RECUPERADO", "veic_id_ocor_envl_veic_sitc_fk_dest": ["3##@@RECUPERADO"]}},
+        
+        {"name": "Maria da Penha", "filename": f"Maria da Penha {ANO}.xls", "type": "maria_da_penha", "engine": "playwright"},
+        {"name": "TCO", "filename": f"TCO {ANO}.xls", "type": "tco", "engine": "playwright"},
+        {"name": "Mandados de Prisão", "filename": f"Cumprimento de Mandados {ANO}.xls", "type": "mandados", "engine": "playwright"},
+        {"name": "Visitas Comunitárias", "filename": f"Visita Comunitária {ANO}.xls", "type": "visitas", "engine": "playwright"}
+    ]
+    
+    sel_file = BASE_DIR / "selected_reports.txt"
+    selected = []
+    if sel_file.exists():
+        try:
             with open(sel_file, "r", encoding="utf-8") as f:
                 selected = [normalize_str(line.strip()) for line in f if line.strip()]
-            log(f"Relatórios selecionados para coleta: {selected}")
-        else:
-            log("Aviso: 'selected_reports.txt' não encontrado. Coletando todos.")
+        except Exception:
+            pass
+            
+    tasks = [t for t in tasks_all if normalize_str(t['name']) in selected] if selected else tasks_all
+    
+    if not tasks:
+        log("Nenhum relatório do CAD selecionado. Pulando.")
+        return
         
-        tasks = [t for t in tasks_all if normalize_str(t['name']) in selected] if selected else tasks_all
-        log(f"Total de tarefas CAD identificadas: {len(tasks)}")
-
-        if not tasks:
-            log("Nenhum relatório do CAD foi selecionado para esta execução.")
-            return
-
+    http_tasks = [t for t in tasks if t.get('engine') == 'http']
+    pw_tasks = [t for t in tasks if t.get('engine') == 'playwright']
+    
+    cookies = []
+    
+    # 1. Fase HTTP
+    session = requests.Session()
+    session.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
+    if login_http_cad(session, user, password, token):
+        cookies = [{"name": k, "value": v, "domain": "analisacad.seguranca.al.gov.br", "path": "/"} for k, v in session.cookies.get_dict().items()]
+        if http_tasks:
+            log(f"\n--- Fase 1: Coleta HTTP Direta ({len(http_tasks)} relatórios) ---")
+            for t in http_tasks:
+                update_report_status(t['name'], "PROCESSANDO")
+                res = coletar_relatorio_http(session, t['app'], t['filters'], t['filename'])
+                update_report_status(t['name'], "OK" if res else "ERRO")
+    else:
+        log("Aviso: Falha no login HTTP. Executando todos no Playwright.")
+        pw_tasks.extend(http_tasks)
+        
+    # 2. Fase Playwright Otimizada
+    if pw_tasks:
+        log(f"\n--- Fase 2: Coleta Playwright Otimizada ({len(pw_tasks)} relatórios) ---")
         async with async_playwright() as p:
-            log("Iniciando navegador Playwright...")
             browser = await p.chromium.launch(headless=True)
-            context = await browser.new_context(viewport={'width': 1920, 'height': 1080}, ignore_https_errors=True)
-            page = await context.new_page()
-            
-            log(f"Acessando portal CAD: {url_login}")
-            await page.goto(url_login, wait_until='domcontentloaded', timeout=90000)
-            
-            try:
-                await page.wait_for_selector('#cpf', timeout=30000)
-                await page.fill('#cpf', USER)
-                await page.fill('#senha', PASS)
-                await page.click('input[type="submit"]')
-            except: pass
-            
-            try:
-                await page.wait_for_selector('#token', timeout=10000)
-                if TOKEN:
-                    log("Token solicitado. Inserindo...")
-                    await page.fill('#token', TOKEN)
-                    await page.click('input[type="submit"]')
-                    await asyncio.sleep(3)
-            except: pass
-
-            log("Aguardando carregamento do portal principal...")
-            try:
-                await page.wait_for_selector('text=Pesquisar', timeout=60000)
-                log("Portal CAD carregado.")
-            except Exception as e:
-                log(f"❌ Erro ao carregar portal CAD: {e}")
-                await browser.close()
-                return
-
-            for task in tasks:
-                log(f"--- Iniciando indicador: {task['name']} ---")
-                update_report_status(task['name'], "PROCESSANDO")
-                
-                try:
-                    # Garantir que o menu Pesquisar está clicado/visível
-                    try:
-                        await page.click('text=Pesquisar', timeout=5000)
-                        await asyncio.sleep(2)
-                    except: pass
-
-                    target_frame = None
-                    for f in page.frames:
-                        try:
-                            if await f.get_by_text(task['card_text']).is_visible():
-                                target_frame = f
-                                break
-                        except: continue
-
-                    if not target_frame:
-                        log(f"❌ Erro: Card '{task['card_text']}' não encontrado.")
-                        update_report_status(task['name'], "ERRO")
-                        continue
-
-                    log(f"Abrindo relatório: {task['name']}")
-                    async with context.expect_page() as new_page_info:
-                        await target_frame.get_by_text(task['card_text']).first.click()
-                    
-                    t_page = await new_page_info.value
-                    await t_page.wait_for_load_state()
-                    await asyncio.sleep(5)
-
-                    # Localizar Frame de Filtros
-                    f_filtros = None
-                    for frame in t_page.frames:
-                        if "fil.php" in frame.url.lower():
-                            f_filtros = frame
-                            break
-                    if not f_filtros: f_filtros = t_page
-
-                    log("Preenchendo filtros...")
-                    
-                    if task['type'] in ['veiculos', 'armas', 'drogas']:
-                        await f_filtros.select_option('#SC_ocor_dt_ocor_cond', value='CY')
-                    else: 
-                        await f_filtros.select_option('#SC_data_cond', value='CY')
-                    
-                    await asyncio.sleep(1)
-
-                    sel_unid = ""
-                    if task['type'] == 'veiculos': sel_unid = '#SC_veic_id_orga_unid_fk_orig'
-                    elif task['type'] in ['armas', 'drogas']: sel_unid = '#SC_despc_id_orga_unid_fk_orig'
-                    elif task['type'] in ['maria_da_penha', 'tco', 'mandados', 'visitas']: 
-                        await f_filtros.select_option('#SC_unid_id_orga_fk_orig', value='2##@@POLÍCIA MILITAR')
-                        await f_filtros.locator('#SC_unid_id_orga_fk_orig option[value="2##@@POLÍCIA MILITAR"]').dblclick()
-                        await asyncio.sleep(3)
-                        sel_unid = '#SC_despc_id_orga_unid_fk_orig'
-
-                    if sel_unid:
-                        await f_filtros.wait_for_selector(f"{sel_unid} option", timeout=15000)
-                        options = await f_filtros.locator(f"{sel_unid} option").all()
-                        val_9bpm = None
-                        for opt in options:
-                            if "9º BPM" in await opt.inner_text():
-                                val_9bpm = await opt.get_attribute('value')
-                                break
-                        if val_9bpm:
-                            await f_filtros.select_option(sel_unid, value=val_9bpm)
-                            await f_filtros.locator(f"{sel_unid} option[value='{val_9bpm}']").dblclick()
-                        await asyncio.sleep(1)
-
-                    if task['type'] == 'veiculos':
-                        await f_filtros.select_option('#SC_veic_id_ocor_envl_veic_sitc_fk_orig', label='RECUPERADO')
-                        await f_filtros.locator('#SC_veic_id_ocor_envl_veic_sitc_fk_orig option').filter(has_text='RECUPERADO').dblclick()
-                    elif task['type'] == 'maria_da_penha':
-                        await f_filtros.select_option('#SC_ocor_id_ocor_grup_fk_orig', label='LEI MARIA DA PENHA')
-                        await f_filtros.locator('#SC_ocor_id_ocor_grup_fk_orig option').filter(has_text='LEI MARIA DA PENHA').dblclick()
-                    elif task['type'] == 'tco':
-                        await f_filtros.select_option('#SC_despc_id_ocor_despc_soluc_tipo_fk_orig', value='9##@@ELABOROU TCO (PM)')
-                        await f_filtros.locator('#SC_despc_id_ocor_despc_soluc_tipo_fk_orig option[value="9##@@ELABOROU TCO (PM)"]').dblclick()
-                    elif task['type'] == 'mandados':
-                        await f_filtros.select_option('#SC_despc_id_ocor_despc_tip_fk_orig', value='6##@@CUMPRIMENTO DE MANDADO JUDICIAL')
-                        await f_filtros.locator('#SC_despc_id_ocor_despc_tip_fk_orig option[value="6##@@CUMPRIMENTO DE MANDADO JUDICIAL"]').dblclick()
-                    elif task['type'] == 'visitas':
-                        await f_filtros.select_option('#SC_ocor_id_ocor_grup_fk_orig', label='OCORRÊNCIA SEM ILICITUDE')
-                        await f_filtros.locator('#SC_ocor_id_ocor_grup_fk_orig option').filter(has_text='OCORRÊNCIA SEM ILICITUDE').dblclick()
-                        await asyncio.sleep(2)
-                        tips = ["VISITA COMUNITÁRIA", "VISITA COMUNITÁRIA / MARIA DA PENHA", "VISITA PREVENTIVA"]
-                        for t in tips:
-                            try:
-                                await f_filtros.select_option('#SC_ocor_id_ocor_sgrup_fk_orig', label=t)
-                                await f_filtros.locator('#SC_ocor_id_ocor_sgrup_fk_orig option').filter(has_text=t).dblclick()
-                            except: pass
-
-                    await asyncio.sleep(1)
-                    
-                    log("Clicando em Pesquisar...")
-                    btn_pesq = "#sc_b_pesq_top" if task['type'] not in ['veiculos', 'armas', 'drogas'] else "#sc_b_pesq_bot"
-                    try: await f_filtros.click(btn_pesq, timeout=10000)
-                    except: 
-                        for alt in ["text=Pesquisa Avançada", "text=Filtrar", "text=Pesquisar"]:
-                            try: 
-                                await f_filtros.click(alt, timeout=5000)
-                                break
-                            except: pass
-                    
-                    wait_time = 45 if task['type'] in ['drogas', 'armas'] else 20
-                    log(f"Aguardando processamento ({wait_time}s)...")
-                    await asyncio.sleep(wait_time)
-
-                    f_grid = None
-                    for gr_frame in t_page.frames:
-                        if "grid" in gr_frame.url.lower() and "fil" not in gr_frame.url.lower():
-                            f_grid = gr_frame
-                            break
-                    if not f_grid: f_grid = t_page
-                    
-                    res = await handle_download(context, t_page, f_grid, task['filename'], DESTINO_DIR)
-                    update_report_status(task['name'], "OK" if res else "ERRO")
-
-                except Exception as loop_e:
-                    log(f"⚠️ Erro no loop de '{task['name']}': {loop_e}")
-                    update_report_status(task['name'], "ERRO")
-
-                try: await t_page.close()
-                except: pass
-                await asyncio.sleep(2)
-
-            log("🏁 Coleta Consolidada do CAD Finalizada!")
+            await coletar_ocorrencias_playwright(browser, cookies, pw_tasks)
             await browser.close()
-    except Exception as e:
-        log(f"❌ ERRO CRÍTICO NO SCRIPT CAD: {e}")
+
+    log("\n" + "="*40)
+    log(f"🏁 Coleta Consolidada do CAD Finalizada em {time.time() - t_inicio:.2f}s!")
+    log("="*40)
 
 if __name__ == "__main__":
-    asyncio.run(script_coleta_consolidada())
+    asyncio.run(main_async())

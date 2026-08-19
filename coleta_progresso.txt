@@ -1,1 +1,11 @@
 PRISÕES|OK
+CVLI|OK
+CVP|OK
+TENTATIVA|OK
+Armas Apreendidas|OK
+Drogas Apreendidas|OK
+Veiculos Recuperados|OK
+Maria da Penha|OK
+TCO|OK
+Mandados de Prisão|OK
+Visitas Comunitárias|OK
